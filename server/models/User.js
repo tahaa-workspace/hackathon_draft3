@@ -15,6 +15,18 @@ const userSchema = new Schema(
     status: { type: String, enum: ALLOWED_STATUSES, required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     mustChangePassword: { type: Boolean, default: false },
+    aadhaarDocument: {
+      publicId: { type: String, default: null },
+      resourceType: { type: String, default: null },
+      originalName: { type: String, default: null },
+      mimeType: { type: String, default: null },
+      fileSize: { type: Number, default: null },
+    },
+    verification: {
+      reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+      reviewedAt: { type: Date, default: null },
+      rejectionReason: { type: String, default: null, trim: true },
+    },
   },
   { timestamps: true }
 );
@@ -25,6 +37,9 @@ userSchema.set('toJSON', {
     ret.id = ret._id.toString();
     delete ret._id;
     delete ret.passwordHash;
+    if (ret.aadhaarDocument) {
+      delete ret.aadhaarDocument.publicId;
+    }
     return ret;
   },
 });
