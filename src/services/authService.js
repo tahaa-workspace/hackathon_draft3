@@ -5,14 +5,19 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request(path, { method = 'GET', body } = {}) {
+async function request(path, { method = 'GET', body, isForm = false } = {}) {
+  const headers = {
+    ...authHeaders(),
+  };
+
+  if (!isForm) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(),
-    },
-    body: body ? JSON.stringify(body) : undefined,
+    headers,
+    body: body ? (isForm ? body : JSON.stringify(body)) : undefined,
   });
 
   const data = await res.json().catch(() => ({}));
@@ -26,10 +31,19 @@ async function request(path, { method = 'GET', body } = {}) {
   return data;
 }
 
-export async function registerUser({ name, username, email, password, confirmPassword }) {
+export async function registerUser({ name, username, email, password, confirmPassword, aadhaar }) {
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('username', username);
+  formData.append('email', email);
+  formData.append('password', password);
+  formData.append('confirmPassword', confirmPassword);
+  formData.append('aadhaar', aadhaar);
+
   return request('/auth/register', {
     method: 'POST',
-    body: { name, username, email, password, confirmPassword },
+    body: formData,
+    isForm: true,
   });
 }
 
@@ -51,12 +65,19 @@ export async function getPendingRegistrations() {
   return request('/admin/registrations');
 }
 
+export async function getAadhaarReviewUrl(id) {
+  return request(`/admin/users/${id}/aadhaar`);
+}
+
 export async function approveUser(id) {
   return request(`/admin/users/${id}/approve`, { method: 'PUT' });
 }
 
-export async function rejectUser(id) {
-  return request(`/admin/users/${id}/reject`, { method: 'PUT' });
+export async function rejectUser(id, reason = '') {
+  return request(`/admin/users/${id}/reject`, {
+    method: 'PUT',
+    body: { reason },
+  });
 }
 
 export async function createBeneficiary({ name, username, email, initialPassword }) {
