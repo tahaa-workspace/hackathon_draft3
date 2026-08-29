@@ -1,3 +1,4 @@
+import UploadDocument from "../components/UploadDocument";
 import { useCallback, useEffect, useState } from 'react';
 import { UserPlus, Loader2, Users, CheckCircle2, Key } from 'lucide-react';
 import Navbar from '../components/Navbar';
@@ -159,6 +160,10 @@ export default function OwnerDashboard() {
                     </div>
                     <div className="mt-1 text-sm text-ink-500">@{b.username} · {b.email}</div>
                     <div className="mt-0.5 text-xs text-ink-400">Created {formatDate(b.createdAt)}</div>
+
+                    <h1>Owner Dashboard</h1>
+
+                    <UploadDocument />
                   </li>
                 ))}
               </ul>

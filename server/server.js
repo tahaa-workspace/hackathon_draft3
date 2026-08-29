@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import documentRoutes from "./routes/documentRoutes.js";
 import express from 'express';
 import cors from 'cors';
 
@@ -17,6 +18,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/beneficiaries', beneficiaryRoutes);
+app.use("/api/documents", documentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found.' });

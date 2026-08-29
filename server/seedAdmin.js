@@ -1,8 +1,15 @@
+import dns from "dns";
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import User from './models/User.js';
+
+
+dns.setServers([
+  "8.8.8.8",
+  "1.1.1.1"
+]);
 
 async function seedAdmin() {
   const name = process.env.ADMIN_NAME || 'System Administrator';
