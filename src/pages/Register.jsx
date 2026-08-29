@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Loader2, CheckCircle2 } from 'lucide-react';
+import { UserPlus, Loader2, CheckCircle2, Upload, FileText } from 'lucide-react';
 import { registerUser } from '../services/authService';
 import { AuthShell } from './Login';
 
@@ -12,14 +12,44 @@ const INITIAL = {
   confirmPassword: '',
 };
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+
 export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState(INITIAL);
+  const [aadhaar, setAadhaar] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0] || null;
+    setError('');
+
+    if (!file) {
+      setAadhaar(null);
+      return;
+    }
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Aadhaar must be a PDF, JPG, JPEG, or PNG file.');
+      e.target.value = '';
+      setAadhaar(null);
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setError('Aadhaar file must be 10 MB or smaller.');
+      e.target.value = '';
+      setAadhaar(null);
+      return;
+    }
+
+    setAadhaar(file);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,10 +63,14 @@ export default function Register() {
       setError('Password must be at least 8 characters long.');
       return;
     }
+    if (!aadhaar) {
+      setError('Please upload your Aadhaar card before submitting registration.');
+      return;
+    }
 
     setLoading(true);
     try {
-      await registerUser(form);
+      await registerUser({ ...form, aadhaar });
       setDone(true);
     } catch (err) {
       setError(err.message);
@@ -47,13 +81,13 @@ export default function Register() {
 
   if (done) {
     return (
-      <AuthShell title="Registration submitted" subtitle="Awaiting administrator approval">
+      <AuthShell title="Registration submitted" subtitle="Awaiting administrator verification">
         <div className="space-y-5">
           <div className="alert-success flex items-start gap-3">
             <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
             <span>
-              Your registration has been received. An administrator must approve your account
-              before you can sign in.
+              Your registration and Aadhaar document have been received. An administrator will
+              review your identity document and approve or reject your owner account.
             </span>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -72,7 +106,7 @@ export default function Register() {
   return (
     <AuthShell
       title="Create an owner account"
-      subtitle="Registrations are reviewed by an administrator"
+      subtitle="Owner registrations require Aadhaar verification by an administrator"
       footer={
         <p className="text-sm text-ink-500">
           Already approved?{' '}
@@ -142,9 +176,38 @@ export default function Register() {
           </div>
         </div>
 
+        <div>
+          <label className="field-label" htmlFor="aadhaar">Aadhaar card</label>
+          <label
+            htmlFor="aadhaar"
+            className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-4 transition hover:border-brand-300 hover:bg-brand-50/40"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+              {aadhaar ? <FileText size={18} /> : <Upload size={18} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-ink-800">
+                {aadhaar ? aadhaar.name : 'Upload Aadhaar image or PDF'}
+              </p>
+              <p className="text-xs text-ink-500">PDF, JPG, JPEG or PNG · maximum 10 MB</p>
+            </div>
+          </label>
+          <input
+            id="aadhaar"
+            type="file"
+            accept="application/pdf,image/jpeg,image/png"
+            onChange={handleFile}
+            className="sr-only"
+            required
+          />
+          <p className="mt-2 text-xs text-ink-500">
+            This document is used only for administrator identity verification and is stored separately from your account data.
+          </p>
+        </div>
+
         <button type="submit" className="btn-primary w-full" disabled={loading}>
           {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-          {loading ? 'Submitting…' : 'Register account'}
+          {loading ? 'Submitting…' : 'Submit registration request'}
         </button>
       </form>
     </AuthShell>
