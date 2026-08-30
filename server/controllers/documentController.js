@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import Document from "../models/Document.js";
+import User from "../models/User.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
@@ -7,6 +8,27 @@ function documentPayload(document) {
     return {
         id: document._id.toString(),
         ownerId: document.ownerId.toString(),
+        title: document.title,
+        category: document.category,
+        originalName: document.originalName,
+        fileType: document.fileType,
+        fileSize: document.fileSize,
+        assignedBeneficiaryIds: (document.assignedBeneficiaries || []).map((id) =>
+            id.toString()
+        ),
+        createdAt: document.createdAt,
+        updatedAt: document.updatedAt,
+    };
+}
+
+function beneficiaryDocumentPayload(document) {
+    return {
+        id: document._id.toString(),
+        ownerId: document.ownerId?._id
+            ? document.ownerId._id.toString()
+            : document.ownerId.toString(),
+        ownerName: document.ownerId?.name || "Owner",
+        ownerUsername: document.ownerId?.username || "",
         title: document.title,
         category: document.category,
         originalName: document.originalName,
@@ -161,15 +183,9 @@ export const uploadDocument = async (req, res) => {
             });
         }
 
-        // 1) Encrypt original bytes in server memory.
-        // Cloudinary never receives the original readable PDF/image.
         const { encrypted, iv, authTag } = encryptBuffer(req.file.buffer);
 
-        // 2) Store the actual encrypted payload separately as an authenticated RAW asset.
         encryptedUpload = await uploadEncryptedBlob(encrypted);
-
-        // 3) Put only a harmless placeholder image in the normal documents folder.
-        // This is what is visible when browsing digital-legacy/documents in Cloudinary.
         placeholderUpload = await uploadPlaceholderImage();
 
         const document = await Document.create({
@@ -177,6 +193,7 @@ export const uploadDocument = async (req, res) => {
             title,
             category,
             originalName: req.file.originalname,
+            assignedBeneficiaries: [],
             publicId: encryptedUpload.public_id,
             resourceType: "raw",
             deliveryType: "authenticated",
@@ -199,7 +216,6 @@ export const uploadDocument = async (req, res) => {
     } catch (error) {
         console.error("Document upload error:", error);
 
-        // Avoid orphaned Cloudinary assets if a later upload/database step fails.
         if (placeholderUpload?.public_id) {
             await cloudinary.uploader.destroy(placeholderUpload.public_id, {
                 resource_type: "image",
@@ -221,19 +237,14 @@ export const uploadDocument = async (req, res) => {
     }
 };
 
-
 export const getDocuments = async (req, res) => {
     try {
         const documents = await Document.find({
             ownerId: req.user.id,
         }).sort({ createdAt: -1 });
 
-        const formattedDocuments = documents.map((document) =>
-            documentPayload(document)
-        );
-
         return res.status(200).json({
-            documents: formattedDocuments,
+            documents: documents.map(documentPayload),
         });
     } catch (error) {
         console.error("Get documents error:", error);
@@ -245,7 +256,80 @@ export const getDocuments = async (req, res) => {
     }
 };
 
+export const updateDocumentBeneficiaries = async (req, res) => {
+    try {
+        const { beneficiaryIds } = req.body;
 
+        if (!Array.isArray(beneficiaryIds)) {
+            return res.status(400).json({
+                message: "beneficiaryIds must be an array.",
+            });
+        }
+
+        const document = await Document.findOne({
+            _id: req.params.id,
+            ownerId: req.user.id,
+        });
+
+        if (!document) {
+            return res.status(404).json({
+                message: "Document not found.",
+            });
+        }
+
+        const uniqueIds = [...new Set(beneficiaryIds.map(String))];
+
+        if (uniqueIds.length > 0) {
+            const validBeneficiaries = await User.find({
+                _id: { $in: uniqueIds },
+                role: "BENEFICIARY",
+                createdBy: req.user.id,
+            }).select("_id");
+
+            if (validBeneficiaries.length !== uniqueIds.length) {
+                return res.status(400).json({
+                    message: "One or more selected beneficiaries do not belong to this owner.",
+                });
+            }
+        }
+
+        document.assignedBeneficiaries = uniqueIds;
+        await document.save();
+
+        return res.status(200).json({
+            message: "Document access updated successfully.",
+            document: documentPayload(document),
+        });
+    } catch (error) {
+        console.error("Update document beneficiaries error:", error);
+
+        return res.status(500).json({
+            message: "Failed to update document access.",
+            error: error.message,
+        });
+    }
+};
+
+export const getAssignedDocuments = async (req, res) => {
+    try {
+        const documents = await Document.find({
+            assignedBeneficiaries: req.user.id,
+        })
+            .populate("ownerId", "name username")
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            documents: documents.map(beneficiaryDocumentPayload),
+        });
+    } catch (error) {
+        console.error("Get assigned documents error:", error);
+
+        return res.status(500).json({
+            message: "Failed to fetch assigned documents.",
+            error: error.message,
+        });
+    }
+};
 
 export const getDocumentAccessUrl = async (req, res) => {
     try {
@@ -257,8 +341,17 @@ export const getDocumentAccessUrl = async (req, res) => {
             });
         }
 
-        // Current prototype rule: only the exact owner may decrypt/view.
-        if (document.ownerId.toString() !== req.user.id) {
+        const isOwner =
+            req.user.role === "OWNER" &&
+            document.ownerId.toString() === req.user.id;
+
+        const isAssignedBeneficiary =
+            req.user.role === "BENEFICIARY" &&
+            (document.assignedBeneficiaries || []).some(
+                (beneficiaryId) => beneficiaryId.toString() === req.user.id
+            );
+
+        if (!isOwner && !isAssignedBeneficiary) {
             return res.status(403).json({
                 message: "You are not authorized to access this document.",
             });
@@ -300,34 +393,6 @@ export const getDocumentAccessUrl = async (req, res) => {
     }
 };
 
-
-
 export const getMyDocuments = async (req, res) => {
-    try {
-        const documents = await Document.find({
-            ownerId: req.user.id,
-        })
-            .select(
-                "title category originalName fileType fileSize createdAt updatedAt"
-            )
-            .sort({
-                createdAt: -1,
-            });
-
-        const formattedDocuments = documents.map((document) =>
-            documentPayload(document)
-        );
-
-        return res.status(200).json({
-            documents: formattedDocuments,
-        });
-
-    } catch (error) {
-        console.error("Get documents error:", error);
-
-        return res.status(500).json({
-            message: "Failed to fetch documents.",
-            error: error.message,
-        });
-    }
+    return getDocuments(req, res);
 };
