@@ -33,14 +33,25 @@ const documentSchema = new mongoose.Schema(
             required: true,
         },
 
+        // Legacy field kept optional so older records do not break.
+        // New private documents must never rely on a permanent Cloudinary URL.
         fileUrl: {
             type: String,
-            required: true,
         },
 
         publicId: {
             type: String,
             required: true,
+        },
+
+        resourceType: {
+            type: String,
+            default: "image",
+        },
+
+        deliveryType: {
+            type: String,
+            default: "authenticated",
         },
 
         fileType: {
