@@ -46,12 +46,12 @@ const documentSchema = new mongoose.Schema(
 
         resourceType: {
             type: String,
-            default: "image",
         },
 
+        // New uploads explicitly store "authenticated" here.
+        // Leaving this without a default lets us identify older public uploads safely.
         deliveryType: {
             type: String,
-            default: "authenticated",
         },
 
         fileType: {
