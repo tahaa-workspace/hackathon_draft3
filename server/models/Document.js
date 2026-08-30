@@ -33,8 +33,8 @@ const documentSchema = new mongoose.Schema(
             required: true,
         },
 
-        // Legacy field kept optional so older records do not break.
-        // New private documents must never rely on a permanent Cloudinary URL.
+        // Legacy compatibility only. New vault files never store a usable
+        // original-document URL in MongoDB.
         fileUrl: {
             type: String,
         },
@@ -44,14 +44,16 @@ const documentSchema = new mongoose.Schema(
             required: true,
         },
 
+        // Encrypted documents are intentionally uploaded as raw binary blobs,
+        // so Cloudinary cannot render the original image/PDF preview.
         resourceType: {
             type: String,
+            default: "raw",
         },
 
-        // New uploads explicitly store "authenticated" here.
-        // Leaving this without a default lets us identify older public uploads safely.
         deliveryType: {
             type: String,
+            default: "authenticated",
         },
 
         fileType: {
@@ -60,6 +62,27 @@ const documentSchema = new mongoose.Schema(
 
         fileSize: {
             type: Number,
+        },
+
+        encryptedSize: {
+            type: Number,
+        },
+
+        encryption: {
+            algorithm: {
+                type: String,
+                default: "aes-256-gcm",
+            },
+            iv: {
+                type: String,
+            },
+            authTag: {
+                type: String,
+            },
+            version: {
+                type: Number,
+                default: 1,
+            },
         },
     },
     {
