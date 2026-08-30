@@ -33,6 +33,15 @@ const documentSchema = new mongoose.Schema(
             required: true,
         },
 
+        // Prototype sharing rule: beneficiaries listed here can immediately
+        // view this document. Later this can be combined with legacy/release status.
+        assignedBeneficiaries: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User",
+            },
+        ],
+
         // Legacy compatibility only. New vault files never store a usable
         // original-document URL in MongoDB.
         fileUrl: {
