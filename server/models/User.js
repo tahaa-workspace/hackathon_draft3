@@ -18,7 +18,6 @@ const userSchema = new Schema(
     aadhaarDocument: {
       publicId: { type: String, default: null },
       resourceType: { type: String, default: null },
-      format: { type: String, default: null },
       originalName: { type: String, default: null },
       mimeType: { type: String, default: null },
       fileSize: { type: Number, default: null },
