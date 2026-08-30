@@ -82,7 +82,6 @@ export async function register(req, res) {
       aadhaarDocument: {
         publicId: uploadResult.public_id,
         resourceType: uploadResult.resource_type,
-        format: uploadResult.format || null,
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         fileSize: req.file.size,
