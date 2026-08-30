@@ -39,13 +39,17 @@ const documentSchema = new mongoose.Schema(
             type: String,
         },
 
+        // Points to the real encrypted RAW .vault asset in Cloudinary.
         publicId: {
             type: String,
             required: true,
         },
 
-        // Encrypted documents are intentionally uploaded as raw binary blobs,
-        // so Cloudinary cannot render the original image/PDF preview.
+        // Points to the harmless dummy image shown in digital-legacy/documents.
+        placeholderPublicId: {
+            type: String,
+        },
+
         resourceType: {
             type: String,
             default: "raw",
