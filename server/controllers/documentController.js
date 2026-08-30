@@ -24,7 +24,6 @@ function getEncryptionKey() {
         throw new Error("DOCUMENT_ENCRYPTION_KEY is not configured.");
     }
 
-    // Recommended format: 64 hexadecimal characters = 32 bytes.
     const key = /^[0-9a-fA-F]{64}$/.test(configuredKey)
         ? Buffer.from(configuredKey, "hex")
         : Buffer.from(configuredKey, "base64");
@@ -72,7 +71,7 @@ function decryptBuffer(encryptedBuffer, encryption) {
 
 async function uploadEncryptedBlob(buffer) {
     return new Promise((resolve, reject) => {
-        const publicId = `digital-legacy/documents/${crypto.randomUUID()}.vault`;
+        const publicId = `digital-legacy/encrypted-documents/${crypto.randomUUID()}.vault`;
 
         const uploadStream = cloudinary.uploader.upload_stream(
             {
@@ -95,6 +94,37 @@ async function uploadEncryptedBlob(buffer) {
     });
 }
 
+function buildPlaceholderSvg() {
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+            <rect width="900" height="600" fill="#f1f5f9"/>
+            <rect x="250" y="105" width="400" height="390" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="6"/>
+            <path d="M555 105 L650 200 L555 200 Z" fill="#dbeafe"/>
+            <rect x="310" y="275" width="280" height="22" rx="11" fill="#94a3b8"/>
+            <rect x="310" y="325" width="220" height="18" rx="9" fill="#cbd5e1"/>
+            <rect x="310" y="365" width="250" height="18" rx="9" fill="#cbd5e1"/>
+            <circle cx="450" cy="225" r="42" fill="#2563eb"/>
+            <path d="M430 225 L444 239 L472 208" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="450" y="445" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#1e293b">SECURE VAULT DOCUMENT</text>
+            <text x="450" y="478" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#64748b">Original file is encrypted and protected</text>
+        </svg>
+    `;
+
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+async function uploadPlaceholderImage() {
+    const placeholderId = `document-${crypto.randomUUID()}`;
+
+    return cloudinary.uploader.upload(buildPlaceholderSvg(), {
+        folder: "digital-legacy/documents",
+        public_id: placeholderId,
+        resource_type: "image",
+        type: "upload",
+        overwrite: false,
+    });
+}
+
 async function downloadEncryptedBlob(document) {
     const signedUrl = cloudinary.url(document.publicId, {
         resource_type: "raw",
@@ -113,6 +143,9 @@ async function downloadEncryptedBlob(document) {
 }
 
 export const uploadDocument = async (req, res) => {
+    let encryptedUpload = null;
+    let placeholderUpload = null;
+
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -128,19 +161,26 @@ export const uploadDocument = async (req, res) => {
             });
         }
 
-        // The original document is encrypted in server memory BEFORE anything
-        // is sent to Cloudinary. Cloudinary therefore receives only ciphertext.
+        // 1) Encrypt original bytes in server memory.
+        // Cloudinary never receives the original readable PDF/image.
         const { encrypted, iv, authTag } = encryptBuffer(req.file.buffer);
-        const uploadResult = await uploadEncryptedBlob(encrypted);
+
+        // 2) Store the actual encrypted payload separately as an authenticated RAW asset.
+        encryptedUpload = await uploadEncryptedBlob(encrypted);
+
+        // 3) Put only a harmless placeholder image in the normal documents folder.
+        // This is what is visible when browsing digital-legacy/documents in Cloudinary.
+        placeholderUpload = await uploadPlaceholderImage();
 
         const document = await Document.create({
             ownerId: req.user.id,
             title,
             category,
             originalName: req.file.originalname,
-            publicId: uploadResult.public_id,
+            publicId: encryptedUpload.public_id,
             resourceType: "raw",
             deliveryType: "authenticated",
+            placeholderPublicId: placeholderUpload.public_id,
             fileType: req.file.mimetype,
             fileSize: req.file.size,
             encryptedSize: encrypted.length,
@@ -158,6 +198,21 @@ export const uploadDocument = async (req, res) => {
         });
     } catch (error) {
         console.error("Document upload error:", error);
+
+        // Avoid orphaned Cloudinary assets if a later upload/database step fails.
+        if (placeholderUpload?.public_id) {
+            await cloudinary.uploader.destroy(placeholderUpload.public_id, {
+                resource_type: "image",
+                type: "upload",
+            }).catch(() => {});
+        }
+
+        if (encryptedUpload?.public_id) {
+            await cloudinary.uploader.destroy(encryptedUpload.public_id, {
+                resource_type: "raw",
+                type: "authenticated",
+            }).catch(() => {});
+        }
 
         return res.status(500).json({
             message: "Failed to upload document.",
@@ -195,8 +250,6 @@ export const getDocumentAccessUrl = async (req, res) => {
             });
         }
 
-        // Cloudinary returns only the encrypted blob. Decryption happens here,
-        // after authentication + OWNER role + ownership checks have passed.
         const encryptedBlob = await downloadEncryptedBlob(document);
         const originalFile = decryptBuffer(encryptedBlob, document.encryption);
 
