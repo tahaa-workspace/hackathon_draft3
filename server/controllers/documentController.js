@@ -100,11 +100,19 @@ export const getDocumentAccessUrl = async (req, res) => {
             });
         }
 
+        // Documents uploaded before authenticated delivery was introduced
+        // must not be treated as private by this endpoint.
+        if (document.deliveryType !== "authenticated") {
+            return res.status(409).json({
+                message: "This document was uploaded before secure private storage was enabled. Please re-upload it securely.",
+            });
+        }
+
         const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
 
         const url = cloudinary.url(document.publicId, {
             resource_type: document.resourceType || "image",
-            type: document.deliveryType || "authenticated",
+            type: "authenticated",
             sign_url: true,
             secure: true,
             expires_at: expiresAt,
