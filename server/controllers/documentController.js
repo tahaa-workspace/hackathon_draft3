@@ -221,6 +221,32 @@ export const uploadDocument = async (req, res) => {
     }
 };
 
+
+export const getDocuments = async (req, res) => {
+    try {
+        const documents = await Document.find({
+            ownerId: req.user.id,
+        }).sort({ createdAt: -1 });
+
+        const formattedDocuments = documents.map((document) =>
+            documentPayload(document)
+        );
+
+        return res.status(200).json({
+            documents: formattedDocuments,
+        });
+    } catch (error) {
+        console.error("Get documents error:", error);
+
+        return res.status(500).json({
+            message: "Failed to fetch documents.",
+            error: error.message,
+        });
+    }
+};
+
+
+
 export const getDocumentAccessUrl = async (req, res) => {
     try {
         const document = await Document.findById(req.params.id);
@@ -269,6 +295,38 @@ export const getDocumentAccessUrl = async (req, res) => {
 
         return res.status(500).json({
             message: "Failed to access document.",
+            error: error.message,
+        });
+    }
+};
+
+
+
+export const getMyDocuments = async (req, res) => {
+    try {
+        const documents = await Document.find({
+            ownerId: req.user.id,
+        })
+            .select(
+                "title category originalName fileType fileSize createdAt updatedAt"
+            )
+            .sort({
+                createdAt: -1,
+            });
+
+        const formattedDocuments = documents.map((document) =>
+            documentPayload(document)
+        );
+
+        return res.status(200).json({
+            documents: formattedDocuments,
+        });
+
+    } catch (error) {
+        console.error("Get documents error:", error);
+
+        return res.status(500).json({
+            message: "Failed to fetch documents.",
             error: error.message,
         });
     }

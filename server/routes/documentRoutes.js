@@ -2,6 +2,7 @@ import express from "express";
 
 import {
     uploadDocument,
+    getDocuments,
     getDocumentAccessUrl,
 } from "../controllers/documentController.js";
 
@@ -11,6 +12,14 @@ import { authorize } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
+
+/*
+=================================
+UPLOAD DOCUMENT
+POST /api/documents
+=================================
+*/
+
 router.post(
     "/",
     protect,
@@ -18,6 +27,29 @@ router.post(
     upload.single("file"),
     uploadDocument
 );
+
+
+/*
+=================================
+GET OWNER DOCUMENTS
+GET /api/documents
+=================================
+*/
+
+router.get(
+    "/",
+    protect,
+    authorize("OWNER"),
+    getDocuments
+);
+
+
+/*
+=================================
+ACCESS SINGLE DOCUMENT
+GET /api/documents/:id/access
+=================================
+*/
 
 router.get(
     "/:id/access",
