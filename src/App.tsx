@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute, { homeForRole } from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -9,14 +9,72 @@ import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import BeneficiaryDashboard from './pages/BeneficiaryDashboard';
 
+function SessionAwareRedirect() {
+  const { hydrated, isAuthenticated, user } = useAuth();
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ink-50">
+        <div className="text-sm text-ink-500">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.mustChangePassword) {
+    return <Navigate to="/change-password?force=1" replace />;
+  }
+
+  return <Navigate to={homeForRole(user.role)} replace />;
+}
+
+function PublicOnlyRoute({ children }) {
+  const { hydrated, isAuthenticated, user } = useAuth();
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ink-50">
+        <div className="text-sm text-ink-500">Loading…</div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && user) {
+    if (user.mustChangePassword) {
+      return <Navigate to="/change-password?force=1" replace />;
+    }
+
+    return <Navigate to={homeForRole(user.role)} replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/" element={<SessionAwareRedirect />} />
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <Login />
+              </PublicOnlyRoute>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <PublicOnlyRoute>
+                <Register />
+              </PublicOnlyRoute>
+            }
+          />
           <Route path="/pending-approval" element={<PendingApproval />} />
 
           <Route
@@ -63,11 +121,9 @@ export default function App() {
             }
           />
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<SessionAwareRedirect />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
   );
 }
-
-void homeForRole;
