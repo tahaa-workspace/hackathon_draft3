@@ -34,34 +34,82 @@ export async function listPendingRegistrations(req, res) {
 
 export async function getAadhaarReviewUrl(req, res) {
   const { id } = req.params;
-  const user = await User.findById(id).select('role status aadhaarDocument');
+
+  const user = await User.findById(id).select(
+    'role status aadhaarDocument'
+  );
 
   if (!user || user.role !== 'OWNER') {
-    return res.status(404).json({ message: 'Owner registration not found.' });
+    return res.status(404).json({
+      message: 'Owner registration not found.',
+    });
   }
 
   if (!user.aadhaarDocument?.publicId) {
-    return res.status(404).json({ message: 'No Aadhaar document is attached to this registration.' });
+    return res.status(404).json({
+      message: 'No Aadhaar document is attached to this registration.',
+    });
+  }
+
+  const document = user.aadhaarDocument;
+  let format = document.format;
+
+  if (!format) {
+    if (document.mimeType === 'application/pdf') {
+      format = 'pdf';
+    } else if (document.mimeType === 'image/png') {
+      format = 'png';
+    } else if (
+      document.mimeType === 'image/jpeg' ||
+      document.mimeType === 'image/jpg'
+    ) {
+      format = 'jpg';
+    }
+  }
+
+  if (!format) {
+    return res.status(400).json({
+      message: 'Unable to determine the verification document format.',
+    });
   }
 
   const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
-  const url = cloudinary.url(user.aadhaarDocument.publicId, {
-    resource_type: user.aadhaarDocument.resourceType || 'image',
-    type: 'authenticated',
-    sign_url: true,
-    secure: true,
-    expires_at: expiresAt,
-  });
 
-  return res.status(200).json({
-    url,
-    expiresAt,
-    document: {
-      originalName: user.aadhaarDocument.originalName,
-      mimeType: user.aadhaarDocument.mimeType,
-      fileSize: user.aadhaarDocument.fileSize,
-    },
-  });
+  try {
+    const url = cloudinary.utils.private_download_url(
+      document.publicId,
+      format,
+      {
+        resource_type: document.resourceType || 'image',
+        type: 'authenticated',
+        expires_at: expiresAt,
+        attachment: false,
+      }
+    );
+
+    return res.status(200).json({
+      url,
+      expiresAt,
+      document: {
+        originalName: document.originalName,
+        mimeType: document.mimeType,
+        fileSize: document.fileSize,
+      },
+    });
+  } catch (error) {
+    console.error('Aadhaar review URL generation failed:', {
+      userId: user._id.toString(),
+      publicId: document.publicId,
+      resourceType: document.resourceType,
+      format,
+      mimeType: document.mimeType,
+      error: error.message,
+    });
+
+    return res.status(500).json({
+      message: 'Unable to generate the verification document review link.',
+    });
+  }
 }
 
 export async function approveUser(req, res) {
