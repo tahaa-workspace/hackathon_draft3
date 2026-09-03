@@ -21,6 +21,35 @@ function registrationPayload(user) {
   };
 }
 
+function accountPayload(user, beneficiaryCounts = new Map()) {
+  const creator = user.createdBy && typeof user.createdBy === 'object'
+    ? user.createdBy
+    : null;
+
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    username: user.username,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    mustChangePassword: user.mustChangePassword,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    beneficiaryCount: user.role === 'OWNER'
+      ? (beneficiaryCounts.get(user._id.toString()) || 0)
+      : 0,
+    owner: user.role === 'BENEFICIARY' && creator
+      ? {
+          id: creator._id.toString(),
+          name: creator.name,
+          username: creator.username,
+          email: creator.email,
+        }
+      : null,
+  };
+}
+
 export async function listPendingRegistrations(req, res) {
   const pending = await User.find({ status: 'PENDING', role: 'OWNER' })
     .sort({ createdAt: 1 })
@@ -29,6 +58,81 @@ export async function listPendingRegistrations(req, res) {
   return res.status(200).json({
     count: pending.length,
     registrations: pending.map(registrationPayload),
+  });
+}
+
+export async function listUsers(req, res) {
+  const users = await User.find({
+    role: { $in: ['OWNER', 'BENEFICIARY'] },
+  })
+    .populate('createdBy', 'name username email')
+    .sort({ createdAt: -1 })
+    .select('-passwordHash');
+
+  const beneficiaryCounts = new Map();
+
+  users.forEach((user) => {
+    if (user.role !== 'BENEFICIARY' || !user.createdBy?._id) return;
+
+    const ownerId = user.createdBy._id.toString();
+    beneficiaryCounts.set(
+      ownerId,
+      (beneficiaryCounts.get(ownerId) || 0) + 1
+    );
+  });
+
+  const accounts = users.map((user) => accountPayload(user, beneficiaryCounts));
+
+  return res.status(200).json({
+    count: accounts.length,
+    summary: {
+      owners: accounts.filter((user) => user.role === 'OWNER').length,
+      beneficiaries: accounts.filter((user) => user.role === 'BENEFICIARY').length,
+      active: accounts.filter((user) => user.status === 'ACTIVE').length,
+      suspended: accounts.filter((user) => user.status === 'SUSPENDED').length,
+      pending: accounts.filter((user) => user.status === 'PENDING').length,
+      rejected: accounts.filter((user) => user.status === 'REJECTED').length,
+    },
+    users: accounts,
+  });
+}
+
+export async function updateUserStatus(req, res) {
+  const { id } = req.params;
+  const { status } = req.body || {};
+
+  if (!['ACTIVE', 'SUSPENDED'].includes(status)) {
+    return res.status(400).json({
+      message: 'Status must be ACTIVE or SUSPENDED.',
+    });
+  }
+
+  const user = await User.findById(id).select('-passwordHash');
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found.' });
+  }
+
+  if (!['OWNER', 'BENEFICIARY'].includes(user.role)) {
+    return res.status(403).json({
+      message: 'Administrator accounts cannot be managed from the account directory.',
+    });
+  }
+
+  if (['PENDING', 'REJECTED'].includes(user.status)) {
+    return res.status(400).json({
+      message: 'Pending and rejected registrations must be handled through the approval workflow.',
+    });
+  }
+
+  user.status = status;
+  await user.save();
+
+  return res.status(200).json({
+    message: status === 'ACTIVE'
+      ? 'Account activated successfully.'
+      : 'Account suspended successfully.',
+    user: accountPayload(user),
   });
 }
 
@@ -119,9 +223,6 @@ export async function rejectUser(req, res) {
   const resourceType =
     user.aadhaarDocument?.resourceType || 'image';
 
-  /*
-   * Delete uploaded verification document from Cloudinary.
-   */
   if (publicId) {
     try {
       const deletionResult =
@@ -131,10 +232,6 @@ export async function rejectUser(req, res) {
           invalidate: true,
         });
 
-      /*
-       * "ok" = deleted successfully
-       * "not found" = asset is already gone, which is also fine
-       */
       if (
         deletionResult.result !== 'ok' &&
         deletionResult.result !== 'not found'
@@ -172,10 +269,6 @@ export async function rejectUser(req, res) {
     }
   }
 
-  /*
-   * Cloudinary asset is now deleted or was already absent.
-   * Remove all verification-document metadata from MongoDB.
-   */
   user.aadhaarDocument = {
     publicId: null,
     resourceType: null,
@@ -184,9 +277,6 @@ export async function rejectUser(req, res) {
     fileSize: null,
   };
 
-  /*
-   * Mark user rejected.
-   */
   user.status = 'REJECTED';
 
   user.verification = {
