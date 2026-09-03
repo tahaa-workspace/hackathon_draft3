@@ -27,7 +27,7 @@ export default function ProfileHero({
       <div className="profile-hero-glow" />
 
 
-      <button
+      {/* <button
         type="button"
         onClick={() =>
           navigate(homeForRole(user.role))
@@ -36,7 +36,7 @@ export default function ProfileHero({
       >
         <ArrowLeft size={15} />
         Dashboard
-      </button>
+      </button> */}
 
 
       <div className="relative z-10 mt-8 flex flex-col gap-6 sm:flex-row sm:items-center">
