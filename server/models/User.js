@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
 const ALLOWED_ROLES = ['ADMIN', 'OWNER', 'BENEFICIARY'];
-const ALLOWED_STATUSES = ['PENDING', 'ACTIVE', 'REJECTED'];
+const ALLOWED_STATUSES = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED'];
 
 const userSchema = new Schema(
   {
