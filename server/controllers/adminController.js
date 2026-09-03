@@ -95,26 +95,111 @@ export async function approveUser(req, res) {
 
 export async function rejectUser(req, res) {
   const { id } = req.params;
-  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+
+  const reason =
+    typeof req.body?.reason === 'string'
+      ? req.body.reason.trim()
+      : '';
+
   const user = await User.findById(id).select('-passwordHash');
 
   if (!user) {
-    return res.status(404).json({ message: 'User not found.' });
-  }
-  if (user.status !== 'PENDING') {
-    return res.status(400).json({ message: `User is not pending (current status: ${user.status}).` });
+    return res.status(404).json({
+      message: 'User not found.',
+    });
   }
 
+  if (user.status !== 'PENDING') {
+    return res.status(400).json({
+      message: `User is not pending (current status: ${user.status}).`,
+    });
+  }
+
+  const publicId = user.aadhaarDocument?.publicId;
+  const resourceType =
+    user.aadhaarDocument?.resourceType || 'image';
+
+  /*
+   * Delete uploaded verification document from Cloudinary.
+   */
+  if (publicId) {
+    try {
+      const deletionResult =
+        await cloudinary.uploader.destroy(publicId, {
+          resource_type: resourceType,
+          type: 'authenticated',
+          invalidate: true,
+        });
+
+      /*
+       * "ok" = deleted successfully
+       * "not found" = asset is already gone, which is also fine
+       */
+      if (
+        deletionResult.result !== 'ok' &&
+        deletionResult.result !== 'not found'
+      ) {
+        console.error(
+          'Unexpected Cloudinary deletion result:',
+          {
+            userId: user._id.toString(),
+            publicId,
+            resourceType,
+            result: deletionResult.result,
+          }
+        );
+
+        return res.status(502).json({
+          message:
+            'Unable to remove the verification document from cloud storage. User was not rejected.',
+        });
+      }
+    } catch (error) {
+      console.error(
+        'Cloudinary verification document deletion failed:',
+        {
+          userId: user._id.toString(),
+          publicId,
+          resourceType,
+          error: error.message,
+        }
+      );
+
+      return res.status(502).json({
+        message:
+          'Unable to remove the verification document from cloud storage. User was not rejected. Please try again.',
+      });
+    }
+  }
+
+  /*
+   * Cloudinary asset is now deleted or was already absent.
+   * Remove all verification-document metadata from MongoDB.
+   */
+  user.aadhaarDocument = {
+    publicId: null,
+    resourceType: null,
+    originalName: null,
+    mimeType: null,
+    fileSize: null,
+  };
+
+  /*
+   * Mark user rejected.
+   */
   user.status = 'REJECTED';
+
   user.verification = {
     reviewedBy: req.user.id,
     reviewedAt: new Date(),
     rejectionReason: reason || null,
   };
+
   await user.save();
 
   return res.status(200).json({
-    message: 'User rejected.',
+    message:
+      'User rejected and verification document deleted successfully.',
     user: registrationPayload(user),
   });
 }

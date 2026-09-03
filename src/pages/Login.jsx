@@ -1,28 +1,62 @@
-import { useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { ShieldCheck, LogIn, Loader2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { homeForRole } from '../components/ProtectedRoute';
+import { useState } from "react";
+import {
+  useNavigate,
+  useLocation,
+  Link,
+} from "react-router-dom";
+
+import {
+  AlertCircle,
+  ArrowRight,
+  Loader2,
+  LogIn,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
+
+import { motion, AnimatePresence } from "framer-motion";
+
+import { useAuth } from "../context/AuthContext";
+import { homeForRole } from "../components/ProtectedRoute";
+
+import AuthShell from "../components/auth/AuthShell";
+import AuthInput from "../components/auth/AuthInput";
+import PasswordInput from "../components/auth/PasswordInput";
+
+import "../styles/auth.css";
 
 export default function Login() {
   const { login } = useAuth();
+
   const navigate = useNavigate();
   const location = useLocation();
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+
+    setError("");
     setLoading(true);
+
     try {
-      const user = await login({ identifier, password });
+      const user = await login({
+        identifier,
+        password,
+      });
+
       const dest = user.mustChangePassword
-        ? '/change-password?force=1'
-        : location.state?.from || homeForRole(user.role);
-      navigate(dest, { replace: true });
+        ? "/change-password?force=1"
+        : location.state?.from ||
+          homeForRole(user.role);
+
+      navigate(dest, {
+        replace: true,
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -31,97 +65,224 @@ export default function Login() {
   };
 
   return (
-    <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to your Digital Legacy account"
-      footer={
-        <p className="text-sm text-ink-500">
-          New owner?{' '}
-          <Link to="/register" className="font-semibold text-brand-700 hover:text-brand-800">
-            Create an account
-          </Link>
-        </p>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <div className="alert-error">{error}</div>}
+    <AuthShell>
 
-        <div>
-          <label className="field-label" htmlFor="identifier">
-            Username or email
-          </label>
-          <input
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 22,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.55,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      >
+
+        {/* Mobile logo */}
+        <div className="mb-8 flex items-center gap-3 lg:hidden">
+
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-violet text-white shadow-lg shadow-brand-600/20">
+            <ShieldCheck size={20} />
+          </div>
+
+          <div>
+            <p className="text-sm font-bold text-ink-900">
+              Digital Legacy
+            </p>
+
+            <p className="text-xs text-ink-400">
+              Next Gen Vault
+            </p>
+          </div>
+
+        </div>
+
+
+        {/* Heading */}
+        <div className="mb-8">
+
+          <div className="auth-eyebrow">
+            <ShieldCheck size={13} />
+            Secure authentication
+          </div>
+
+          <h1 className="mt-4 text-3xl font-bold tracking-[-0.025em] text-ink-900 sm:text-[34px]">
+            Welcome back
+          </h1>
+
+          <p className="mt-2 max-w-md text-sm leading-6 text-ink-500">
+            Sign in to securely access your Digital
+            Legacy account.
+          </p>
+
+        </div>
+
+
+        {/* Error */}
+        <AnimatePresence mode="wait">
+
+          {error && (
+            <motion.div
+              key="login-error"
+              initial={{
+                opacity: 0,
+                y: -8,
+                scale: 0.98,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: 1,
+              }}
+              exit={{
+                opacity: 0,
+                y: -5,
+              }}
+              className="auth-error"
+            >
+              <div className="auth-error-icon">
+                <AlertCircle size={16} />
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold">
+                  Unable to sign in
+                </p>
+
+                <p className="mt-0.5 text-xs opacity-80">
+                  {error}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+
+
+        {/* Login Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="mt-6 space-y-5"
+        >
+
+          <AuthInput
             id="identifier"
-            className="field-input"
+            label="Username or email"
+            icon={Mail}
             value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
+            onChange={(e) =>
+              setIdentifier(e.target.value)
+            }
             placeholder="you@example.com"
             autoComplete="username"
+            disabled={loading}
             required
           />
-        </div>
 
-        <div>
-          <label className="field-label" htmlFor="password">
-            Password
-          </label>
-          <input
+
+          <PasswordInput
             id="password"
-            type="password"
-            className="field-input"
+            label="Password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            onChange={(e) =>
+              setPassword(e.target.value)
+            }
+            placeholder="Enter your password"
             autoComplete="current-password"
+            disabled={loading}
             required
           />
-        </div>
 
-        <button type="submit" className="btn-primary w-full" disabled={loading}>
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
-          {loading ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
-    </AuthShell>
-  );
-}
 
-export function AuthShell({ title, subtitle, footer, children }) {
-  return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-ink-50 to-brand-50 lg:flex-row">
-      <aside className="hidden w-1/2 flex-col justify-between bg-brand-700 p-12 text-white lg:flex">
-        <div className="flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
-            <ShieldCheck size={22} />
-          </span>
-          <span className="text-lg font-semibold">Digital Legacy</span>
-        </div>
-        <div className="max-w-md">
-          <h2 className="text-3xl font-semibold leading-tight">
-            A trusted foundation for what matters most.
-          </h2>
-          <p className="mt-4 text-brand-100">
-            Securely manage who can access your digital legacy — with admin-approved owners,
-            role-based access, and protected beneficiary accounts.
-          </p>
-        </div>
-        <p className="text-xs text-brand-200">
-          Authentication module · v1.0
-        </p>
-      </aside>
+          {/* Small security information */}
+          <div className="flex items-center gap-2 text-xs text-ink-400">
+            <ShieldCheck
+              size={13}
+              className="text-green-500"
+            />
 
-      <main className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="card">
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold text-ink-900">{title}</h1>
-              {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
-            </div>
-            {children}
+            Your credentials are sent through a
+            protected authentication flow.
           </div>
-          {footer && <div className="mt-6 text-center">{footer}</div>}
+
+
+          {/* Sign in button */}
+          <motion.button
+            type="submit"
+            disabled={loading}
+            whileTap={
+              loading
+                ? undefined
+                : {
+                    scale: 0.985,
+                  }
+            }
+            className="auth-submit-button"
+          >
+
+            <span className="auth-button-shine" />
+
+            <span className="relative z-10 flex items-center justify-center gap-2">
+
+              {loading ? (
+                <>
+                  <Loader2
+                    size={17}
+                    className="animate-spin"
+                  />
+
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <LogIn size={17} />
+
+                  Sign in
+
+                  <ArrowRight
+                    size={16}
+                    className="auth-submit-arrow"
+                  />
+                </>
+              )}
+
+            </span>
+
+          </motion.button>
+
+        </form>
+
+
+        {/* Registration */}
+        <div className="auth-divider">
+          <span>New to Next Gen Vault?</span>
         </div>
-      </main>
-    </div>
+
+        <Link
+          to="/register"
+          className="auth-create-button group"
+        >
+          Create an Owner account
+
+          <ArrowRight
+            size={15}
+            className="transition-transform duration-200 group-hover:translate-x-1"
+          />
+        </Link>
+
+
+        {/* Footer */}
+        <p className="mt-8 text-center text-[11px] leading-5 text-ink-400">
+          Access is protected according to your
+          assigned role and permissions.
+        </p>
+
+      </motion.div>
+
+    </AuthShell>
   );
 }

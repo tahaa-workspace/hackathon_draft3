@@ -1,12 +1,31 @@
 import { useNavigate } from 'react-router-dom';
-import { Shield, User, Users, LogOut, KeyRound } from 'lucide-react';
+import {
+  Shield,
+  User,
+  Users,
+  LogOut,
+  KeyRound,
+  LayoutDashboard,
+  Home,
+  ChevronRight,
+} from 'lucide-react';
+
 import { useAuth } from '../context/AuthContext';
 import { homeForRole } from './ProtectedRoute';
 
 const ROLE_META = {
-  ADMIN: { label: 'Administrator', Icon: Shield },
-  OWNER: { label: 'Owner', Icon: User },
-  BENEFICIARY: { label: 'Beneficiary', Icon: Users },
+  ADMIN: {
+    label: 'Administrator',
+    Icon: Shield,
+  },
+  OWNER: {
+    label: 'Owner',
+    Icon: User,
+  },
+  BENEFICIARY: {
+    label: 'Beneficiary',
+    Icon: Users,
+  },
 };
 
 export default function Navbar() {
@@ -15,52 +34,213 @@ export default function Navbar() {
 
   if (!user) return null;
 
-  const meta = ROLE_META[user.role] || ROLE_META.BENEFICIARY;
-  const Icon = meta.Icon;
+  const meta =
+    ROLE_META[user.role] ||
+    ROLE_META.BENEFICIARY;
+
+  const RoleIcon = meta.Icon;
 
   const handleLogout = () => {
     logout();
-    navigate('/login', { replace: true });
+
+    navigate('/', {
+      replace: true,
+    });
+  };
+
+  const goToDashboard = () => {
+    navigate(
+      homeForRole(user.role)
+    );
+  };
+
+  const goToHome = () => {
+    navigate('/');
+  };
+
+  const goToPassword = () => {
+    navigate(
+      '/change-password'
+    );
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-ink-100 bg-white/80 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/90 shadow-[0_8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+
+        {/* ===================================================
+            BRAND / HOME
+        =================================================== */}
+
         <button
-          onClick={() => navigate(homeForRole(user.role))}
-          className="flex items-center gap-2 text-left"
+          type="button"
+          onClick={goToHome}
+          className="group flex items-center gap-3 rounded-xl px-1 py-1 text-left transition duration-200 hover:-translate-y-0.5"
+          title="Go to home"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
-            <Shield size={18} />
+          <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white shadow-md transition duration-200 group-hover:scale-105 group-hover:shadow-lg">
+            <Shield size={19} />
+
+            <span className="absolute inset-0 rounded-xl ring-1 ring-white/20" />
           </span>
-          <span className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold text-ink-800">Digital Legacy</span>
-            <span className="text-xs text-ink-500">Authentication Module</span>
+
+          <span className="hidden flex-col leading-tight sm:flex">
+            <span className="text-sm font-bold text-ink-900 transition group-hover:text-brand-700">
+              Digital Legacy
+            </span>
+
+            <span className="text-xs font-medium text-ink-400">
+              Secure Legacy Management
+            </span>
           </span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden items-center gap-2 rounded-full bg-ink-50 px-3 py-1.5 text-xs font-medium text-ink-600 sm:flex">
-            <Icon size={14} />
-            <span>{meta.label}</span>
-            <span className="text-ink-300">·</span>
-            <span className="max-w-[12rem] truncate">{user.username}</span>
-          </div>
+
+        {/* ===================================================
+            RIGHT SIDE
+        =================================================== */}
+
+        <div className="flex items-center gap-2 sm:gap-3">
+
+          {/* Dashboard */}
           <button
-            onClick={() => navigate('/change-password')}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-ink-600 transition hover:bg-ink-50 hover:text-ink-800"
+            type="button"
+            onClick={goToDashboard}
+            className="group hidden items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition duration-200 hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-lg md:inline-flex"
+          >
+            <LayoutDashboard
+              size={16}
+              className="transition group-hover:scale-110"
+            />
+
+            Dashboard
+
+            <ChevronRight
+              size={15}
+              className="transition duration-200 group-hover:translate-x-0.5"
+            />
+          </button>
+
+
+          {/* Mobile dashboard icon */}
+          <button
+            type="button"
+            onClick={goToDashboard}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm transition hover:scale-105 hover:bg-brand-700 md:hidden"
+            title="Dashboard"
+          >
+            <LayoutDashboard
+              size={17}
+            />
+          </button>
+
+
+          {/* Role / User chip */}
+          <button
+  type="button"
+  onClick={() => navigate('/profile')}
+  className="group hidden items-center gap-3 rounded-xl border border-ink-100 bg-white px-3 py-2 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50/60 hover:shadow-md sm:flex"
+  title="Open profile"
+>
+  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-50 text-brand-700 transition duration-200 group-hover:bg-brand-100 group-hover:scale-105">
+    <RoleIcon size={15} />
+  </div>
+
+  <div className="min-w-0 leading-tight">
+    <p className="text-xs font-semibold text-ink-800 transition group-hover:text-brand-800">
+      {meta.label}
+    </p>
+
+    <p className="max-w-[130px] truncate text-xs text-ink-400 transition group-hover:text-brand-600">
+      @{user.username}
+    </p>
+  </div>
+</button>
+
+          {/* Change Password */}
+          <button
+            type="button"
+            onClick={goToPassword}
+            className="group inline-flex items-center gap-2 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-ink-600 transition duration-200 hover:-translate-y-0.5 hover:border-ink-100 hover:bg-white hover:text-ink-900 hover:shadow-sm"
             title="Change password"
           >
-            <KeyRound size={16} />
-            <span className="hidden sm:inline">Password</span>
+            <KeyRound
+              size={16}
+              className="transition group-hover:scale-110"
+            />
+
+            <span className="hidden lg:inline">
+              Password
+            </span>
           </button>
+
+
+          {/* Sign Out */}
           <button
+            type="button"
             onClick={handleLogout}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-ink-50 px-2.5 py-2 text-sm font-medium text-ink-600 transition hover:bg-ink-100 hover:text-ink-800"
+            className="group inline-flex items-center gap-2 rounded-xl bg-ink-50 px-3 py-2.5 text-sm font-medium text-ink-600 transition duration-200 hover:-translate-y-0.5 hover:bg-red-50 hover:text-red-600 hover:shadow-sm"
           >
-            <LogOut size={16} />
-            <span className="hidden sm:inline">Sign out</span>
+            <LogOut
+              size={16}
+              className="transition group-hover:translate-x-0.5"
+            />
+
+            <span className="hidden lg:inline">
+              Sign out
+            </span>
           </button>
+
+        </div>
+      </div>
+
+
+      {/* ===================================================
+          SUB NAV FOR SMALL DEVICES
+      =================================================== */}
+
+      <div className="border-t border-ink-100 bg-white/70 md:hidden">
+
+        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-2 sm:px-6">
+
+          <button
+            type="button"
+            onClick={goToHome}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
+          >
+            <Home
+              size={14}
+            />
+
+            Home
+          </button>
+
+
+          <button
+            type="button"
+            onClick={goToDashboard}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
+          >
+            <LayoutDashboard
+              size={14}
+            />
+
+            Dashboard
+          </button>
+
+
+          <button
+            type="button"
+            onClick={goToPassword}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
+          >
+            <KeyRound
+              size={14}
+            />
+
+            Password
+          </button>
+
         </div>
       </div>
     </header>

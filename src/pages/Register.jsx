@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, Loader2, CheckCircle2, Upload, FileText } from 'lucide-react';
 import { registerUser } from '../services/authService';
-import { AuthShell } from './Login';
+import AuthShell from "../components/auth/AuthShell";
 
 const INITIAL = {
   name: '',

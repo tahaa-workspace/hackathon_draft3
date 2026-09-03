@@ -1,15 +1,42 @@
 const API_BASE = '/api';
 
+// const API_BASE = '/api';
+
+/*
+ * Return the authentication header for protected API calls.
+ *
+ * sessionStorage is used instead of localStorage so that
+ * the login does not survive after the browser/tab session ends.
+ */
 function authHeaders() {
-  const token = localStorage.getItem('dl_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const token = sessionStorage.getItem('dl_token');
+
+  return token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
 }
 
-async function request(path, { method = 'GET', body, isForm = false } = {}) {
+
+/*
+ * Common API request helper.
+ */
+async function request(
+  path,
+  {
+    method = 'GET',
+    body,
+    isForm = false,
+  } = {}
+) {
   const headers = {
     ...authHeaders(),
   };
 
+  /*
+   * Do not manually set Content-Type for FormData.
+   * The browser will automatically add the correct
+   * multipart/form-data boundary.
+   */
   if (!isForm) {
     headers['Content-Type'] = 'application/json';
   }
@@ -17,27 +44,55 @@ async function request(path, { method = 'GET', body, isForm = false } = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
-    body: body ? (isForm ? body : JSON.stringify(body)) : undefined,
+    body: body
+      ? isForm
+        ? body
+        : JSON.stringify(body)
+      : undefined,
   });
 
   const data = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    const message = data.message || `Request failed (${res.status})`;
+    const message =
+      data.message ||
+      `Request failed (${res.status})`;
+
     const error = new Error(message);
+
     error.status = res.status;
     error.payload = data;
+
     throw error;
   }
+
   return data;
 }
 
-export async function registerUser({ name, username, email, password, confirmPassword, aadhaar }) {
+
+/* =========================================================
+   AUTHENTICATION
+   ========================================================= */
+
+export async function registerUser({
+  name,
+  username,
+  email,
+  password,
+  confirmPassword,
+  aadhaar,
+}) {
   const formData = new FormData();
+
   formData.append('name', name);
   formData.append('username', username);
   formData.append('email', email);
   formData.append('password', password);
-  formData.append('confirmPassword', confirmPassword);
+  formData.append(
+    'confirmPassword',
+    confirmPassword
+  );
+
   formData.append('aadhaar', aadhaar);
 
   return request('/auth/register', {
@@ -47,67 +102,198 @@ export async function registerUser({ name, username, email, password, confirmPas
   });
 }
 
-export async function loginUser({ identifier, password }) {
+
+export async function loginUser({
+  identifier,
+  password,
+}) {
   return request('/auth/login', {
     method: 'POST',
-    body: { identifier, password },
+    body: {
+      identifier,
+      password,
+    },
   });
 }
 
-export async function changePassword({ currentPassword, newPassword, confirmNewPassword }) {
+
+export async function changePassword({
+  currentPassword,
+  newPassword,
+  confirmNewPassword,
+}) {
   return request('/auth/change-password', {
     method: 'POST',
-    body: { currentPassword, newPassword, confirmNewPassword },
+    body: {
+      currentPassword,
+      newPassword,
+      confirmNewPassword,
+    },
   });
 }
+
+
+/* =========================================================
+   ADMIN
+   ========================================================= */
 
 export async function getPendingRegistrations() {
   return request('/admin/registrations');
 }
 
+
 export async function getAadhaarReviewUrl(id) {
-  return request(`/admin/users/${id}/aadhaar`);
+  return request(
+    `/admin/users/${id}/aadhaar`
+  );
 }
+
 
 export async function approveUser(id) {
-  return request(`/admin/users/${id}/approve`, { method: 'PUT' });
+  return request(
+    `/admin/users/${id}/approve`,
+    {
+      method: 'PUT',
+    }
+  );
 }
 
-export async function rejectUser(id, reason = '') {
-  return request(`/admin/users/${id}/reject`, {
-    method: 'PUT',
-    body: { reason },
-  });
+
+export async function rejectUser(
+  id,
+  reason = ''
+) {
+  return request(
+    `/admin/users/${id}/reject`,
+    {
+      method: 'PUT',
+      body: {
+        reason,
+      },
+    }
+  );
 }
 
-export async function createBeneficiary({ name, username, email, initialPassword }) {
+
+/* =========================================================
+   BENEFICIARY
+   ========================================================= */
+
+export async function createBeneficiary({
+  name,
+  username,
+  email,
+  initialPassword,
+}) {
   return request('/beneficiaries', {
     method: 'POST',
-    body: { name, username, email, initialPassword },
+    body: {
+      name,
+      username,
+      email,
+      initialPassword,
+    },
   });
 }
+
 
 export async function listBeneficiaries() {
   return request('/beneficiaries');
 }
 
-export function persistSession(token, user) {
-  localStorage.setItem('dl_token', token);
-  localStorage.setItem('dl_user', JSON.stringify(user));
+
+/* =========================================================
+   SESSION MANAGEMENT
+   ========================================================= */
+
+/*
+ * Save authentication only for the current browser session.
+ *
+ * IMPORTANT:
+ * Previously this used localStorage. localStorage survives
+ * browser restarts, which caused the previous Admin account
+ * to automatically appear logged in when the app was reopened.
+ */
+export function persistSession(
+  token,
+  user
+) {
+  /*
+   * Remove data created by the old version of the app.
+   */
+  localStorage.removeItem('dl_token');
+  localStorage.removeItem('dl_user');
+
+  /*
+   * Save only for the current browser session.
+   */
+  sessionStorage.setItem(
+    'dl_token',
+    token
+  );
+
+  sessionStorage.setItem(
+    'dl_user',
+    JSON.stringify(user)
+  );
 }
 
+
+/*
+ * Logout completely.
+ */
 export function clearSession() {
+  /*
+   * Current session data.
+   */
+  sessionStorage.removeItem('dl_token');
+  sessionStorage.removeItem('dl_user');
+
+  /*
+   * Also remove any old persistent data
+   * left by earlier versions of the application.
+   */
   localStorage.removeItem('dl_token');
   localStorage.removeItem('dl_user');
 }
 
+
+/*
+ * Restore a login only if the current browser session
+ * still has valid session data.
+ */
 export function loadStoredSession() {
-  const token = localStorage.getItem('dl_token');
-  const userJson = localStorage.getItem('dl_user');
-  if (!token || !userJson) return null;
+  /*
+   * Always remove the old persistent localStorage
+   * login information.
+   */
+  localStorage.removeItem('dl_token');
+  localStorage.removeItem('dl_user');
+
+  const token =
+    sessionStorage.getItem('dl_token');
+
+  const userJson =
+    sessionStorage.getItem('dl_user');
+
+  if (!token || !userJson) {
+    return null;
+  }
+
   try {
-    return { token, user: JSON.parse(userJson) };
+    const user = JSON.parse(userJson);
+
+    return {
+      token,
+      user,
+    };
   } catch {
+    /*
+     * If stored user data is damaged,
+     * clean everything instead of crashing.
+     */
+    clearSession();
+
     return null;
   }
 }

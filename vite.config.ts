@@ -5,19 +5,26 @@ import { fileURLToPath, URL } from 'node:url';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+
   server: {
+    host: '127.0.0.1',
+    port: 5173,
+
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
+        secure: false,
       },
     },
   },
