@@ -214,10 +214,35 @@ export default function AdminDashboard() {
     setDocumentLoadingId(item.id);
     setError('');
 
+    // Open the tab immediately while the browser still considers this
+    // operation part of the user's click. Opening only after awaiting the
+    // API call can be blocked by popup protection.
+    const reviewWindow = window.open('', '_blank');
+
+    if (!reviewWindow) {
+      setDocumentLoadingId(null);
+      setError('The browser blocked the Aadhaar review window. Please allow pop-ups for this site and try again.');
+      return;
+    }
+
+    reviewWindow.document.title = 'Loading Aadhaar review…';
+    reviewWindow.document.body.innerHTML = `
+      <div style="font-family:Arial,sans-serif;padding:24px;color:#334155">
+        Loading secure Aadhaar document…
+      </div>
+    `;
+
     try {
       const { url } = await getAadhaarReviewUrl(item.id);
-      window.open(url, '_blank', 'noopener,noreferrer');
+
+      if (!url) {
+        throw new Error('A secure Aadhaar review URL was not returned.');
+      }
+
+      reviewWindow.opener = null;
+      reviewWindow.location.replace(url);
     } catch (err) {
+      reviewWindow.close();
       setError(err.message);
     } finally {
       setDocumentLoadingId(null);
