@@ -1,7 +1,5 @@
 const API_BASE = '/api';
 
-// const API_BASE = '/api';
-
 /*
  * Return the authentication header for protected API calls.
  *
@@ -138,7 +136,25 @@ export async function changePassword({
    ========================================================= */
 
 export async function getPendingRegistrations() {
-  return request('/admin/registrations');
+  const data = await request('/admin/registrations');
+  return data.registrations || [];
+}
+
+
+export async function getAllUsers() {
+  const data = await request('/admin/users');
+  return data.users || [];
+}
+
+
+export async function updateUserStatus(id, status) {
+  return request(
+    `/admin/users/${id}/status`,
+    {
+      method: 'PUT',
+      body: { status },
+    }
+  );
 }
 
 
