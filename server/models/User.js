@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
 
-const ALLOWED_ROLES = ['ADMIN', 'OWNER', 'BENEFICIARY'];
+const ALLOWED_ROLES = ['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER'];
 const ALLOWED_STATUSES = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED'];
 
 const userSchema = new Schema(
@@ -22,6 +22,22 @@ const userSchema = new Schema(
       mimeType: { type: String, default: null },
       fileSize: { type: Number, default: null },
     },
+    lawyerProfile: {
+      phone: { type: String, default: null, trim: true },
+      city: { type: String, default: null, trim: true },
+      state: { type: String, default: null, trim: true },
+      enrollmentNumber: { type: String, default: null, trim: true },
+      stateBarCouncil: { type: String, default: null, trim: true },
+      yearsOfExperience: { type: Number, default: null, min: 0 },
+      practiceAreas: [{ type: String, trim: true }],
+      credentialDocument: {
+        publicId: { type: String, default: null },
+        resourceType: { type: String, default: null },
+        originalName: { type: String, default: null },
+        mimeType: { type: String, default: null },
+        fileSize: { type: Number, default: null },
+      },
+    },
     verification: {
       reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
       reviewedAt: { type: Date, default: null },
@@ -39,6 +55,9 @@ userSchema.set('toJSON', {
     delete ret.passwordHash;
     if (ret.aadhaarDocument) {
       delete ret.aadhaarDocument.publicId;
+    }
+    if (ret.lawyerProfile?.credentialDocument) {
+      delete ret.lawyerProfile.credentialDocument.publicId;
     }
     return ret;
   },
