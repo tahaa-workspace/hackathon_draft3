@@ -19,6 +19,7 @@ import LawyerRegister from './pages/LawyerRegister';
 import PendingApproval from './pages/PendingApproval';
 import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLegacyClaims from './pages/AdminLegacyClaims';
 import OwnerDashboard from './pages/OwnerDashboard';
 import BeneficiaryDashboard from './pages/BeneficiaryDashboard';
 import LawyerDashboard from './pages/LawyerDashboard';
@@ -148,6 +149,15 @@ export default function App() {
                 allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}
               >
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/legacy-claims"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminLegacyClaims />
               </ProtectedRoute>
             }
           />
