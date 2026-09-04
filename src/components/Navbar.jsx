@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Home,
   ChevronRight,
+  Briefcase,
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +26,10 @@ const ROLE_META = {
   BENEFICIARY: {
     label: 'Beneficiary',
     Icon: Users,
+  },
+  LAWYER: {
+    label: 'Lawyer',
+    Icon: Briefcase,
   },
 };
 
