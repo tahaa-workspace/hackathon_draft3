@@ -28,5 +28,6 @@ export function homeForRole(role) {
   if (role === 'ADMIN') return '/admin';
   if (role === 'OWNER') return '/owner';
   if (role === 'BENEFICIARY') return '/beneficiary';
+  if (role === 'LAWYER') return '/lawyer';
   return '/login';
 }
