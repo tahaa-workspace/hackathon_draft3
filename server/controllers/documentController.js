@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import Document from "../models/Document.js";
 import User from "../models/User.js";
+import LegacyClaim from "../models/LegacyClaim.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
@@ -312,7 +313,19 @@ export const updateDocumentBeneficiaries = async (req, res) => {
 
 export const getAssignedDocuments = async (req, res) => {
     try {
+        const approvedClaims = await LegacyClaim.find({
+            beneficiaryId: req.user.id,
+            status: "APPROVED_INFORMATION_RELEASED",
+        }).select("ownerId");
+
+        const releasedOwnerIds = approvedClaims.map((claim) => claim.ownerId);
+
+        if (releasedOwnerIds.length === 0) {
+            return res.status(200).json({ documents: [] });
+        }
+
         const documents = await Document.find({
+            ownerId: { $in: releasedOwnerIds },
             assignedBeneficiaries: req.user.id,
         })
             .populate("ownerId", "name username")
@@ -345,15 +358,25 @@ export const getDocumentAccessUrl = async (req, res) => {
             req.user.role === "OWNER" &&
             document.ownerId.toString() === req.user.id;
 
-        const isAssignedBeneficiary =
+        let isReleasedBeneficiary = false;
+
+        if (
             req.user.role === "BENEFICIARY" &&
             (document.assignedBeneficiaries || []).some(
                 (beneficiaryId) => beneficiaryId.toString() === req.user.id
-            );
+            )
+        ) {
+            const approvedClaim = await LegacyClaim.exists({
+                ownerId: document.ownerId,
+                beneficiaryId: req.user.id,
+                status: "APPROVED_INFORMATION_RELEASED",
+            });
+            isReleasedBeneficiary = Boolean(approvedClaim);
+        }
 
-        if (!isOwner && !isAssignedBeneficiary) {
+        if (!isOwner && !isReleasedBeneficiary) {
             return res.status(403).json({
-                message: "You are not authorized to access this document.",
+                message: "This document remains locked until the Legacy Access Claim is approved.",
             });
         }
 
