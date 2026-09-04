@@ -101,6 +101,52 @@ export async function registerUser({
 }
 
 
+export async function registerLawyer({
+  name,
+  username,
+  email,
+  password,
+  confirmPassword,
+  phone,
+  city,
+  state,
+  enrollmentNumber,
+  stateBarCouncil,
+  yearsOfExperience,
+  practiceAreas,
+  credential,
+}) {
+  const formData = new FormData();
+
+  formData.append('name', name);
+  formData.append('username', username);
+  formData.append('email', email);
+  formData.append('password', password);
+  formData.append('confirmPassword', confirmPassword);
+  formData.append('phone', phone);
+  formData.append('city', city);
+  formData.append('state', state);
+  formData.append('enrollmentNumber', enrollmentNumber);
+  formData.append('stateBarCouncil', stateBarCouncil);
+
+  if (yearsOfExperience !== '') {
+    formData.append('yearsOfExperience', yearsOfExperience);
+  }
+
+  if (practiceAreas?.trim()) {
+    formData.append('practiceAreas', practiceAreas.trim());
+  }
+
+  formData.append('credential', credential);
+
+  return request('/auth/register-lawyer', {
+    method: 'POST',
+    body: formData,
+    isForm: true,
+  });
+}
+
+
 export async function loginUser({
   identifier,
   password,
