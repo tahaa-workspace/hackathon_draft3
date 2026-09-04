@@ -21,9 +21,10 @@ import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import BeneficiaryDashboard from './pages/BeneficiaryDashboard';
+import LawyerDashboard from './pages/LawyerDashboard';
 import Profile from './pages/Profile';
 
-type UserRole = 'ADMIN' | 'OWNER' | 'BENEFICIARY';
+type UserRole = 'ADMIN' | 'OWNER' | 'BENEFICIARY' | 'LAWYER';
 
 type AuthUser = {
   id: string;
@@ -133,7 +134,7 @@ export default function App() {
             path="/change-password"
             element={
               <ProtectedRoute
-                allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY']}
+                allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}
               >
                 <ChangePassword />
               </ProtectedRoute>
@@ -144,7 +145,7 @@ export default function App() {
             path="/profile"
             element={
               <ProtectedRoute
-                allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY']}
+                allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}
               >
                 <Profile />
               </ProtectedRoute>
@@ -174,6 +175,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['BENEFICIARY']}>
                 <BeneficiaryDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/lawyer"
+            element={
+              <ProtectedRoute allowedRoles={['LAWYER']}>
+                <LawyerDashboard />
               </ProtectedRoute>
             }
           />
