@@ -78,23 +78,6 @@ const legacyClaimSchema = new Schema(
   { timestamps: true }
 );
 
-legacyClaimSchema.index(
-  { ownerId: 1, beneficiaryId: 1 },
-  {
-    unique: true,
-    partialFilterExpression: {
-      status: {
-        $in: [
-          'LEGACY_ACCESS_REQUESTED',
-          'UNDER_ADMIN_REVIEW',
-          'MORE_INFORMATION_REQUIRED',
-          'UNDER_LAWYER_REVIEW',
-          'APPROVED_INFORMATION_RELEASED',
-          'ON_HOLD_DISPUTED',
-        ],
-      },
-    },
-  }
-);
+legacyClaimSchema.index({ ownerId: 1, beneficiaryId: 1, status: 1 });
 
 export default mongoose.model('LegacyClaim', legacyClaimSchema);
