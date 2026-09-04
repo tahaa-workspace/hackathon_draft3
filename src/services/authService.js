@@ -100,7 +100,6 @@ export async function registerUser({
   });
 }
 
-
 export async function registerLawyer({
   name,
   username,
@@ -129,12 +128,12 @@ export async function registerLawyer({
   formData.append('enrollmentNumber', enrollmentNumber);
   formData.append('stateBarCouncil', stateBarCouncil);
 
-  if (yearsOfExperience !== '') {
+  if (yearsOfExperience !== '' && yearsOfExperience != null) {
     formData.append('yearsOfExperience', yearsOfExperience);
   }
 
-  if (practiceAreas?.trim()) {
-    formData.append('practiceAreas', practiceAreas.trim());
+  if (practiceAreas) {
+    formData.append('practiceAreas', practiceAreas);
   }
 
   formData.append('credential', credential);
@@ -207,6 +206,12 @@ export async function updateUserStatus(id, status) {
 export async function getAadhaarReviewUrl(id) {
   return request(
     `/admin/users/${id}/aadhaar`
+  );
+}
+
+export async function getLawyerCredentialReviewUrl(id) {
+  return request(
+    `/admin/users/${id}/lawyer-credential`
   );
 }
 
