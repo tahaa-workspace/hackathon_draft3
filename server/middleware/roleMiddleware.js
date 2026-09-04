@@ -1,4 +1,4 @@
-const ROLES = new Set(['ADMIN', 'OWNER', 'BENEFICIARY']);
+const ROLES = new Set(['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']);
 
 export function authorize(...allowed) {
   const normalized = allowed.filter((r) => ROLES.has(r));
