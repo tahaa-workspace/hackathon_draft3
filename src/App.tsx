@@ -15,6 +15,7 @@ import ProtectedRoute, {
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import LawyerRegister from './pages/LawyerRegister';
 import PendingApproval from './pages/PendingApproval';
 import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
@@ -110,6 +111,15 @@ export default function App() {
             element={
               <PublicOnlyRoute>
                 <Register />
+              </PublicOnlyRoute>
+            }
+          />
+
+          <Route
+            path="/register-lawyer"
+            element={
+              <PublicOnlyRoute>
+                <LawyerRegister />
               </PublicOnlyRoute>
             }
           />
