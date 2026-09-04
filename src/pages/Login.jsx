@@ -8,6 +8,7 @@ import {
 import {
   AlertCircle,
   ArrowRight,
+  BriefcaseBusiness,
   Loader2,
   LogIn,
   Mail,
@@ -262,17 +263,27 @@ export default function Login() {
           <span>New to Next Gen Vault?</span>
         </div>
 
-        <Link
-          to="/register"
-          className="auth-create-button group"
-        >
-          Create an Owner account
+        <div className="space-y-3">
+          <Link
+            to="/register"
+            className="auth-create-button group"
+          >
+            Create an Owner account
 
-          <ArrowRight
-            size={15}
-            className="transition-transform duration-200 group-hover:translate-x-1"
-          />
-        </Link>
+            <ArrowRight
+              size={15}
+              className="transition-transform duration-200 group-hover:translate-x-1"
+            />
+          </Link>
+
+          <Link
+            to="/register-lawyer"
+            className="flex items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm font-semibold text-ink-700 transition hover:border-brand-300 hover:bg-brand-50/40 hover:text-brand-700"
+          >
+            <BriefcaseBusiness size={16} />
+            Register as Lawyer
+          </Link>
+        </div>
 
 
         {/* Footer */}
