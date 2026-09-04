@@ -23,6 +23,7 @@ import {
   approveUser,
   rejectUser,
   getAadhaarReviewUrl,
+  getLawyerCredentialReviewUrl,
   getPendingRegistrations,
   getAllUsers,
   updateUserStatus,
@@ -41,6 +42,17 @@ function StatusBadge({ status }) {
       {status}
     </span>
   );
+}
+
+function RoleBadge({ role }) {
+  const label = role === 'OWNER' ? 'Owner' : role === 'LAWYER' ? 'Lawyer' : 'Beneficiary';
+  const style = role === 'LAWYER'
+    ? 'bg-violet-50 text-violet-700'
+    : role === 'OWNER'
+      ? 'bg-brand-50 text-brand-700'
+      : 'bg-sky-50 text-sky-700';
+
+  return <span className={`badge ${style}`}>{label}</span>;
 }
 
 function formatDate(value) {
@@ -92,6 +104,7 @@ export default function AdminDashboard() {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [documentLoadingId, setDocumentLoadingId] = useState(null);
 
+  const [pendingFilter, setPendingFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -132,8 +145,6 @@ export default function AdminDashboard() {
     refreshAll();
   }, [refreshAll]);
 
-  // If the Admin leaves this tab while a new Owner registers, refresh the
-  // pending queue immediately when the Admin returns to the dashboard.
   useEffect(() => {
     const handleFocus = () => {
       loadPending();
@@ -144,9 +155,21 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [loadPending, loadAccounts]);
 
+  const pendingCounts = useMemo(() => ({
+    owners: pending.filter((item) => item.role === 'OWNER').length,
+    lawyers: pending.filter((item) => item.role === 'LAWYER').length,
+  }), [pending]);
+
+  const filteredPending = useMemo(() => (
+    pendingFilter === 'ALL'
+      ? pending
+      : pending.filter((item) => item.role === pendingFilter)
+  ), [pending, pendingFilter]);
+
   const stats = useMemo(() => ({
     owners: accounts.filter((item) => item.role === 'OWNER').length,
     beneficiaries: accounts.filter((item) => item.role === 'BENEFICIARY').length,
+    lawyers: accounts.filter((item) => item.role === 'LAWYER').length,
     active: accounts.filter((item) => item.status === 'ACTIVE').length,
     suspended: accounts.filter((item) => item.status === 'SUSPENDED').length,
   }), [accounts]);
@@ -162,10 +185,14 @@ export default function AdminDashboard() {
         item.owner?.name,
         item.owner?.username,
         item.owner?.email,
+        item.lawyerProfile?.enrollmentNumber,
+        item.lawyerProfile?.stateBarCouncil,
+        item.lawyerProfile?.city,
+        item.lawyerProfile?.state,
       ].filter(Boolean);
 
       const matchesSearch =
-        !needle || searchable.some((value) => value.toLowerCase().includes(needle));
+        !needle || searchable.some((value) => String(value).toLowerCase().includes(needle));
       const matchesRole = roleFilter === 'ALL' || item.role === roleFilter;
       const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
 
@@ -173,32 +200,16 @@ export default function AdminDashboard() {
     });
   }, [accounts, search, roleFilter, statusFilter]);
 
-  const handleApprove = async (id) => {
-    setActionLoadingId(id);
-    setPendingError('');
-
-    try {
-      await approveUser(id);
-      await refreshAll();
-    } catch (err) {
-      setPendingError(err.message);
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const handleReject = async (id) => {
-    const confirmed = window.confirm(
-      'Reject this owner registration? The uploaded Aadhaar verification document will also be deleted from Cloudinary.'
-    );
-
+  const handleApprove = async (item) => {
+    const label = item.role === 'LAWYER' ? 'lawyer' : 'owner';
+    const confirmed = window.confirm(`Approve this ${label} registration?`);
     if (!confirmed) return;
 
-    setActionLoadingId(id);
+    setActionLoadingId(item.id);
     setPendingError('');
 
     try {
-      await rejectUser(id);
+      await approveUser(item.id);
       await refreshAll();
     } catch (err) {
       setPendingError(err.message);
@@ -207,24 +218,50 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleViewAadhaar = async (item) => {
+  const handleReject = async (item) => {
+    const label = item.role === 'LAWYER' ? 'lawyer' : 'owner';
+    const documentLabel = item.role === 'LAWYER' ? 'professional credential' : 'Aadhaar verification document';
+    const reason = window.prompt(
+      `Reject this ${label} registration? The uploaded ${documentLabel} will be deleted from Cloudinary.\n\nOptional rejection reason:`
+    );
+
+    if (reason === null) return;
+
+    setActionLoadingId(item.id);
+    setPendingError('');
+
+    try {
+      await rejectUser(item.id, reason);
+      await refreshAll();
+    } catch (err) {
+      setPendingError(err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleViewVerification = async (item) => {
     setDocumentLoadingId(item.id);
     setPendingError('');
 
+    const isLawyer = item.role === 'LAWYER';
+    const label = isLawyer ? 'professional credential' : 'Aadhaar document';
     const reviewWindow = window.open('', '_blank');
 
     if (!reviewWindow) {
       setDocumentLoadingId(null);
-      setPendingError('The browser blocked the Aadhaar review window. Please allow pop-ups for this site and try again.');
+      setPendingError(`The browser blocked the ${label} review window. Please allow pop-ups for this site and try again.`);
       return;
     }
 
-    reviewWindow.document.title = 'Loading Aadhaar review…';
-    reviewWindow.document.body.innerHTML = '<div style="font-family:Arial,sans-serif;padding:24px;color:#334155">Loading secure Aadhaar document…</div>';
+    reviewWindow.document.title = `Loading ${label} review…`;
+    reviewWindow.document.body.innerHTML = `<div style="font-family:Arial,sans-serif;padding:24px;color:#334155">Loading secure ${label}…</div>`;
 
     try {
-      const { url } = await getAadhaarReviewUrl(item.id);
-      reviewWindow.location.replace(url);
+      const result = isLawyer
+        ? await getLawyerCredentialReviewUrl(item.id)
+        : await getAadhaarReviewUrl(item.id);
+      reviewWindow.location.replace(result.url);
     } catch (err) {
       reviewWindow.close();
       setPendingError(err.message);
@@ -264,7 +301,7 @@ export default function AdminDashboard() {
             <p className="mb-1 text-sm font-semibold text-brand-600">Administration</p>
             <h1 className="text-3xl font-bold tracking-tight text-ink-900">Account control center</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500">
-              Review new owner registrations first, then manage existing owner and beneficiary accounts.
+              Review Owner identity applications and Lawyer professional credentials, then manage approved platform accounts.
             </p>
           </div>
 
@@ -291,35 +328,56 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={Clock3} label="Pending review" value={pending.length} helper="New owner registrations" />
+        <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard icon={Clock3} label="Pending review" value={pending.length} helper={`${pendingCounts.owners} owners · ${pendingCounts.lawyers} lawyers`} />
           <StatCard icon={UserRoundCheck} label="Owners" value={stats.owners} helper="Registered vault owners" />
           <StatCard icon={Link2} label="Beneficiaries" value={stats.beneficiaries} helper="Owner-created accounts" />
+          <StatCard icon={ShieldCheck} label="Lawyers" value={stats.lawyers} helper="Professional accounts" />
           <StatCard icon={Users} label="Total accounts" value={accounts.length} helper={`${stats.active} active · ${stats.suspended} suspended`} />
         </section>
 
-        {/* Pending requests are intentionally shown before the full directory. */}
         <section className="mb-8 overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-amber-100 bg-amber-50/60 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 border-b border-amber-100 bg-amber-50/60 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
                 <Inbox size={18} />
               </div>
               <div>
-                <h2 className="font-semibold text-ink-900">Pending owner approvals</h2>
-                <p className="text-xs text-ink-500">{pending.length} waiting for identity review</p>
+                <h2 className="font-semibold text-ink-900">Pending registration approvals</h2>
+                <p className="text-xs text-ink-500">Verify Owner identity proofs and Lawyer professional credentials before activation.</p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={loadPending}
-              disabled={pendingLoading}
-              className="inline-flex items-center gap-2 self-start rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={pendingLoading ? 'animate-spin' : ''} />
-              Refresh requests
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                ['ALL', `All (${pending.length})`],
+                ['OWNER', `Owners (${pendingCounts.owners})`],
+                ['LAWYER', `Lawyers (${pendingCounts.lawyers})`],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPendingFilter(value)}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    pendingFilter === value
+                      ? 'border-amber-300 bg-amber-100 text-amber-800'
+                      : 'border-amber-200 bg-white text-amber-700 hover:bg-amber-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={loadPending}
+                disabled={pendingLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={pendingLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {pendingError && (
@@ -337,44 +395,73 @@ export default function AdminDashboard() {
             <div className="px-5 py-12 text-center">
               <ShieldCheck size={34} className="mx-auto mb-3 text-green-500" />
               <p className="font-semibold text-ink-800">No pending requests</p>
-              <p className="mt-1 text-sm text-ink-400">New owner registrations will appear here for Aadhaar review.</p>
+              <p className="mt-1 text-sm text-ink-400">New Owner and Lawyer registrations will appear here for review.</p>
             </div>
+          ) : filteredPending.length === 0 ? (
+            <div className="px-5 py-12 text-center text-sm text-ink-400">No pending registrations in this category.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-ink-100">
                 <thead className="bg-white">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
                     <th className="px-5 py-3">Applicant</th>
+                    <th className="px-5 py-3">Role</th>
+                    <th className="px-5 py-3">Profile details</th>
+                    <th className="px-5 py-3">Verification document</th>
                     <th className="px-5 py-3">Submitted</th>
-                    <th className="px-5 py-3">Aadhaar</th>
                     <th className="px-5 py-3">Status</th>
                     <th className="px-5 py-3 text-right">Decision</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100">
-                  {pending.map((item) => {
-                    const aadhaar = item.aadhaarDocument;
+                  {filteredPending.map((item) => {
+                    const isLawyer = item.role === 'LAWYER';
+                    const profile = item.lawyerProfile;
+                    const verificationDocument = isLawyer
+                      ? profile?.credentialDocument
+                      : item.aadhaarDocument;
+
                     return (
-                      <tr key={item.id} className="transition hover:bg-amber-50/30">
+                      <tr key={item.id} className="align-top transition hover:bg-amber-50/30">
                         <td className="px-5 py-4">
                           <p className="font-semibold text-ink-800">{item.name}</p>
                           <p className="text-xs text-ink-400">{item.email}</p>
                           <p className="text-xs text-ink-400">@{item.username}</p>
                         </td>
-                        <td className="px-5 py-4 text-sm text-ink-500">{formatDate(item.createdAt)}</td>
+                        <td className="px-5 py-4"><RoleBadge role={item.role} /></td>
+                        <td className="px-5 py-4 text-xs leading-5 text-ink-500">
+                          {isLawyer ? (
+                            <div className="min-w-[210px]">
+                              <p><span className="font-semibold text-ink-700">Enrollment:</span> {profile?.enrollmentNumber || '—'}</p>
+                              <p><span className="font-semibold text-ink-700">Bar Council:</span> {profile?.stateBarCouncil || '—'}</p>
+                              <p><span className="font-semibold text-ink-700">Location:</span> {[profile?.city, profile?.state].filter(Boolean).join(', ') || '—'}</p>
+                              <p><span className="font-semibold text-ink-700">Phone:</span> {profile?.phone || '—'}</p>
+                              {profile?.yearsOfExperience != null && (
+                                <p><span className="font-semibold text-ink-700">Experience:</span> {profile.yearsOfExperience} years</p>
+                              )}
+                              {profile?.practiceAreas?.length > 0 && (
+                                <p className="max-w-[240px]"><span className="font-semibold text-ink-700">Practice:</span> {profile.practiceAreas.join(', ')}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span>Owner identity registration</span>
+                          )}
+                        </td>
                         <td className="px-5 py-4">
-                          {aadhaar?.available ? (
-                            <div className="flex items-center gap-3">
+                          {verificationDocument?.available ? (
+                            <div className="flex min-w-[240px] items-center gap-3">
                               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
                                 <FileText size={16} />
                               </div>
-                              <div className="min-w-0">
-                                <p className="max-w-[170px] truncate text-sm font-medium text-ink-700">{aadhaar.originalName || 'Aadhaar document'}</p>
-                                <p className="text-xs text-ink-400">{formatFileSize(aadhaar.fileSize)}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="max-w-[150px] truncate text-sm font-medium text-ink-700">
+                                  {verificationDocument.originalName || (isLawyer ? 'Professional credential' : 'Aadhaar document')}
+                                </p>
+                                <p className="text-xs text-ink-400">{formatFileSize(verificationDocument.fileSize)}</p>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => handleViewAadhaar(item)}
+                                onClick={() => handleViewVerification(item)}
                                 disabled={documentLoadingId === item.id}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-ink-100 px-2.5 py-2 text-xs font-semibold text-ink-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-50"
                               >
@@ -386,12 +473,13 @@ export default function AdminDashboard() {
                             <span className="text-xs font-medium text-red-500">Document missing</span>
                           )}
                         </td>
+                        <td className="px-5 py-4 text-sm text-ink-500">{formatDate(item.createdAt)}</td>
                         <td className="px-5 py-4"><StatusBadge status={item.status} /></td>
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => handleReject(item.id)}
+                              onClick={() => handleReject(item)}
                               disabled={actionLoadingId === item.id}
                               className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                             >
@@ -399,7 +487,7 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleApprove(item.id)}
+                              onClick={() => handleApprove(item)}
                               disabled={actionLoadingId === item.id}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-50"
                             >
@@ -420,7 +508,7 @@ export default function AdminDashboard() {
         <section className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm">
           <div className="border-b border-ink-100 px-5 py-5">
             <h2 className="text-lg font-semibold text-ink-900">Account directory</h2>
-            <p className="mt-1 text-sm text-ink-400">Search existing owners and beneficiaries and manage account access.</p>
+            <p className="mt-1 text-sm text-ink-400">Search Owners, Beneficiaries and Lawyers and manage active account access.</p>
           </div>
 
           {accountsError && (
@@ -433,7 +521,7 @@ export default function AdminDashboard() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search name, username, email or owner"
+                placeholder="Search name, email, enrollment or location"
                 className="w-full rounded-xl border border-ink-100 bg-white py-2.5 pl-10 pr-3 text-sm text-ink-800 outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
               />
             </label>
@@ -448,6 +536,7 @@ export default function AdminDashboard() {
                 <option value="ALL">All roles</option>
                 <option value="OWNER">Owners</option>
                 <option value="BENEFICIARY">Beneficiaries</option>
+                <option value="LAWYER">Lawyers</option>
               </select>
             </label>
 
@@ -477,7 +566,7 @@ export default function AdminDashboard() {
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
                     <th className="px-5 py-3">Account</th>
                     <th className="px-5 py-3">Role</th>
-                    <th className="px-5 py-3">Relationship</th>
+                    <th className="px-5 py-3">Relationship / professional info</th>
                     <th className="px-5 py-3">Status</th>
                     <th className="px-5 py-3 text-right">Control</th>
                   </tr>
@@ -490,13 +579,15 @@ export default function AdminDashboard() {
                         <p className="text-xs text-ink-400">{item.email}</p>
                         <p className="text-xs text-ink-400">@{item.username}</p>
                       </td>
-                      <td className="px-5 py-4 text-sm font-medium text-ink-600">{item.role === 'OWNER' ? 'Owner' : 'Beneficiary'}</td>
+                      <td className="px-5 py-4"><RoleBadge role={item.role} /></td>
                       <td className="px-5 py-4 text-sm text-ink-600">
                         {item.role === 'OWNER'
                           ? `${item.beneficiaryCount || 0} ${item.beneficiaryCount === 1 ? 'beneficiary' : 'beneficiaries'}`
-                          : item.owner
-                            ? `Owner: ${item.owner.name} (@${item.owner.username})`
-                            : 'Owner unavailable'}
+                          : item.role === 'BENEFICIARY'
+                            ? item.owner
+                              ? `Owner: ${item.owner.name} (@${item.owner.username})`
+                              : 'Owner unavailable'
+                            : `${item.lawyerProfile?.enrollmentNumber || 'Enrollment unavailable'} · ${[item.lawyerProfile?.city, item.lawyerProfile?.state].filter(Boolean).join(', ') || 'Location unavailable'}`}
                       </td>
                       <td className="px-5 py-4"><StatusBadge status={item.status} /></td>
                       <td className="px-5 py-4">
