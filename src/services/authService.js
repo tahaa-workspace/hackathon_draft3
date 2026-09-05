@@ -364,3 +364,70 @@ export function loadStoredSession() {
     return null;
   }
 }
+
+
+export async function requestPasswordChangeOTP(
+    currentPassword,
+    newPassword,
+    token
+) {
+    const response = await fetch(
+        "/api/auth/change-password/request-otp",
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+
+                Authorization: `Bearer ${token}`,
+            },
+
+            body: JSON.stringify({
+                currentPassword,
+                newPassword,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message || "Failed to request OTP."
+        );
+    }
+
+    return data;
+}
+
+export async function verifyPasswordChangeOTP(
+    otp,
+    token
+) {
+    const response = await fetch(
+        "/api/auth/change-password/verify-otp",
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+
+                Authorization: `Bearer ${token}`,
+            },
+
+            body: JSON.stringify({
+                otp,
+            }),
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message || "OTP verification failed."
+        );
+    }
+
+    return data;
+}

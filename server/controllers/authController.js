@@ -3,6 +3,9 @@ import streamifier from 'streamifier';
 import User from '../models/User.js';
 import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
+import crypto from "crypto";
+import PasswordChangeOTP from "../models/PasswordChangeOTP.js";
+import transporter from "../config/mailer.js";
 
 const SALT_ROUNDS = 12;
 
@@ -313,32 +316,261 @@ export async function login(req, res) {
   });
 }
 
-export async function changePassword(req, res) {
-  const { currentPassword, newPassword, confirmNewPassword } = req.body;
+// export async function changePassword(req, res) {
+//   const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
-  if (!currentPassword || !newPassword || !confirmNewPassword) {
-    return res.status(400).json({ message: 'All password fields are required.' });
-  }
-  if (newPassword !== confirmNewPassword) {
-    return res.status(400).json({ message: 'New password and confirm password do not match.' });
-  }
-  if (newPassword.length < 8) {
-    return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
-  }
+//   if (!currentPassword || !newPassword || !confirmNewPassword) {
+//     return res.status(400).json({ message: 'All password fields are required.' });
+//   }
+//   if (newPassword !== confirmNewPassword) {
+//     return res.status(400).json({ message: 'New password and confirm password do not match.' });
+//   }
+//   if (newPassword.length < 8) {
+//     return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
+//   }
 
-  const user = await User.findById(req.user.id).select('+passwordHash');
-  if (!user) {
-    return res.status(404).json({ message: 'User not found.' });
-  }
+//   const user = await User.findById(req.user.id).select('+passwordHash');
+//   if (!user) {
+//     return res.status(404).json({ message: 'User not found.' });
+//   }
 
-  const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
-  if (!isMatch) {
-    return res.status(401).json({ message: 'Current password is incorrect.' });
-  }
+//   const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+//   if (!isMatch) {
+//     return res.status(401).json({ message: 'Current password is incorrect.' });
+//   }
 
-  user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  user.mustChangePassword = false;
-  await user.save();
+//   user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+//   user.mustChangePassword = false;
+//   await user.save();
 
-  return res.status(200).json({ message: 'Password updated successfully.' });
-}
+//   return res.status(200).json({ message: 'Password updated successfully.' });
+// }
+
+
+export const requestPasswordChangeOTP = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                message: "Current password and new password are required.",
+            });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                message: "New password must be at least 8 characters long.",
+            });
+        }
+
+        // IMPORTANT: Explicitly select passwordHash
+        const user = await User.findById(req.user.id).select("+passwordHash");
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found.",
+            });
+        }
+
+        // Extra safety check
+        if (!user.passwordHash) {
+            return res.status(500).json({
+                message: "Password data is missing for this user.",
+            });
+        }
+
+        // Verify current password
+        const passwordMatch = await bcrypt.compare(
+            currentPassword,
+            user.passwordHash
+        );
+
+        if (!passwordMatch) {
+            return res.status(401).json({
+                message: "Current password is incorrect.",
+            });
+        }
+
+        // Prevent using same password
+        const samePassword = await bcrypt.compare(
+            newPassword,
+            user.passwordHash
+        );
+
+        if (samePassword) {
+            return res.status(400).json({
+                message: "New password cannot be the same as current password.",
+            });
+        }
+
+        // Generate secure 6-digit OTP
+        const otp = crypto.randomInt(100000, 1000000).toString();
+
+        // Hash OTP
+        const otpHash = await bcrypt.hash(otp, 12);
+
+        // Hash new password before storing temporarily
+        const newPasswordHash = await bcrypt.hash(newPassword, 12);
+
+        // OTP expires after 5 minutes
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Delete any previous OTP request
+        await PasswordChangeOTP.findOneAndDelete({
+            userId: user._id,
+        });
+
+        // Create new OTP request
+        await PasswordChangeOTP.create({
+            userId: user._id,
+            otpHash,
+            newPasswordHash,
+            expiresAt,
+            attempts: 0,
+        });
+
+        // Send OTP to registered email
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: user.email,
+            subject: "NextGen Vault - Password Change Verification",
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2>NextGen Vault Security Verification</h2>
+
+                    <p>You requested to change your account password.</p>
+
+                    <p>Your verification code is:</p>
+
+                    <h1 style="
+                        letter-spacing: 8px;
+                        background: #f3f4f6;
+                        padding: 15px;
+                        display: inline-block;
+                    ">
+                        ${otp}
+                    </h1>
+
+                    <p>This OTP will expire in <strong>5 minutes</strong>.</p>
+
+                    <p>If you did not request a password change, please ignore this email.</p>
+
+                    <hr />
+
+                    <small>
+                        NextGen Vault - Secure Digital Legacy Management
+                    </small>
+                </div>
+            `,
+        });
+
+        return res.status(200).json({
+            message: "OTP sent to your registered email address.",
+        });
+
+    } catch (error) {
+        console.error("Password change OTP request error:", error);
+
+        return res.status(500).json({
+            message: "Failed to send verification OTP.",
+            error: error.message,
+        });
+    }
+};
+
+export const verifyPasswordChangeOTP = async (req, res) => {
+    try {
+        const { otp } = req.body;
+
+        if (!otp) {
+            return res.status(400).json({
+                message: "OTP is required.",
+            });
+        }
+
+        const otpRequest = await PasswordChangeOTP.findOne({
+            userId: req.user.id,
+        });
+
+        if (!otpRequest) {
+            return res.status(404).json({
+                message: "No active password change request found.",
+            });
+        }
+
+        // Check expiry
+        if (new Date() > otpRequest.expiresAt) {
+            await PasswordChangeOTP.deleteOne({
+                _id: otpRequest._id,
+            });
+
+            return res.status(400).json({
+                message: "OTP has expired. Please request a new OTP.",
+            });
+        }
+
+        // Maximum 5 attempts
+        if (otpRequest.attempts >= 5) {
+            await PasswordChangeOTP.deleteOne({
+                _id: otpRequest._id,
+            });
+
+            return res.status(429).json({
+                message:
+                    "Maximum OTP attempts exceeded. Please request a new OTP.",
+            });
+        }
+
+        // Increase attempts
+        otpRequest.attempts += 1;
+        await otpRequest.save();
+
+        // Verify OTP
+        const otpMatch = await bcrypt.compare(
+            otp,
+            otpRequest.otpHash
+        );
+
+        if (!otpMatch) {
+            return res.status(400).json({
+                message: `Invalid OTP. ${
+                    5 - otpRequest.attempts
+                } attempts remaining.`,
+            });
+        }
+
+        // Find user
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found.",
+            });
+        }
+
+        // Update password with already hashed password
+        user.passwordHash = otpRequest.newPasswordHash;
+
+        // Password successfully changed
+        user.mustChangePassword = false;
+
+        await user.save();
+
+        // Delete OTP record immediately
+        await PasswordChangeOTP.deleteOne({
+            _id: otpRequest._id,
+        });
+
+        return res.status(200).json({
+            message:
+                "Password changed successfully with multi-factor authentication.",
+        });
+    } catch (error) {
+        console.error("Password OTP verification error:", error);
+
+        return res.status(500).json({
+            message: "Failed to verify OTP.",
+            error: error.message,
+        });
+    }
+};
