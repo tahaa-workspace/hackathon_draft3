@@ -4,11 +4,70 @@ const { Schema } = mongoose;
 
 const FILE_SCHEMA = new Schema(
   {
-    publicId: { type: String, required: true },
-    resourceType: { type: String, default: 'image' },
-    originalName: { type: String, required: true },
-    mimeType: { type: String, required: true },
-    fileSize: { type: Number, required: true },
+    // Real encrypted .vault file
+    publicId: {
+      type: String,
+      required: true,
+    },
+
+    // Harmless SVG placeholder shown in normal Cloudinary folder
+    placeholderPublicId: {
+      type: String,
+      default: null,
+    },
+
+    // Encrypted files are stored as RAW Cloudinary resources
+    resourceType: {
+      type: String,
+      default: 'raw',
+    },
+
+    deliveryType: {
+      type: String,
+      default: 'authenticated',
+    },
+
+    originalName: {
+      type: String,
+      required: true,
+    },
+
+    mimeType: {
+      type: String,
+      required: true,
+    },
+
+    fileSize: {
+      type: Number,
+      required: true,
+    },
+
+    encryptedSize: {
+      type: Number,
+      required: true,
+    },
+
+    encryption: {
+      algorithm: {
+        type: String,
+        default: 'aes-256-gcm',
+      },
+
+      iv: {
+        type: String,
+        required: true,
+      },
+
+      authTag: {
+        type: String,
+        required: true,
+      },
+
+      version: {
+        type: Number,
+        default: 1,
+      },
+    },
   },
   { _id: false }
 );
@@ -31,53 +90,130 @@ const legacyClaimSchema = new Schema(
       required: true,
       index: true,
     },
+
     beneficiaryId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
       index: true,
     },
+
     assignedLawyerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       default: null,
       index: true,
     },
+
     identityProofType: {
       type: String,
       required: true,
-      enum: ['AADHAAR', 'PASSPORT', 'DRIVING_LICENCE', 'VOTER_ID', 'OTHER'],
+      enum: [
+        'AADHAAR',
+        'PASSPORT',
+        'DRIVING_LICENCE',
+        'VOTER_ID',
+        'OTHER',
+      ],
     },
-    deathCertificate: { type: FILE_SCHEMA, required: true },
-    identityProof: { type: FILE_SCHEMA, required: true },
-    supportingDocument: { type: FILE_SCHEMA, default: null },
-    beneficiaryRemarks: { type: String, default: '', trim: true, maxlength: 2000 },
+
+    deathCertificate: {
+      type: FILE_SCHEMA,
+      required: true,
+    },
+
+    identityProof: {
+      type: FILE_SCHEMA,
+      required: true,
+    },
+
+    supportingDocument: {
+      type: FILE_SCHEMA,
+      default: null,
+    },
+
+    beneficiaryRemarks: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 2000,
+    },
+
     status: {
       type: String,
       enum: LEGACY_CLAIM_STATUSES,
       default: 'LEGACY_ACCESS_REQUESTED',
       index: true,
     },
+
     adminReview: {
-      reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-      reviewedAt: { type: Date, default: null },
-      remarks: { type: String, default: '', trim: true, maxlength: 2000 },
+      reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+
+      remarks: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: 2000,
+      },
     },
+
     lawyerReview: {
-      reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-      reviewedAt: { type: Date, default: null },
-      remarks: { type: String, default: '', trim: true, maxlength: 2000 },
+      reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+
+      remarks: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: 2000,
+      },
+
       action: {
         type: String,
-        enum: ['REQUEST_MORE_INFORMATION', 'APPROVE', 'HOLD', null],
+        enum: [
+          'REQUEST_MORE_INFORMATION',
+          'APPROVE',
+          'HOLD',
+          null,
+        ],
         default: null,
       },
     },
-    releasedAt: { type: Date, default: null },
+
+    releasedAt: {
+      type: Date,
+      default: null,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-legacyClaimSchema.index({ ownerId: 1, beneficiaryId: 1, status: 1 });
+legacyClaimSchema.index({
+  ownerId: 1,
+  beneficiaryId: 1,
+  status: 1,
+});
 
-export default mongoose.model('LegacyClaim', legacyClaimSchema);
+export default mongoose.model(
+  'LegacyClaim',
+  legacyClaimSchema
+);

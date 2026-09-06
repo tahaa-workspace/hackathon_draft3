@@ -83,10 +83,47 @@ export default function LawyerDashboard() {
 
   const visibleClaims = filter === 'ALL' ? claims : claims.filter((claim) => claim.status === filter);
 
-  const openEvidence = async (claimId, kind) => {
-    try { const { url } = await getClaimFileUrl(claimId, kind); window.open(url, '_blank', 'noopener,noreferrer'); }
-    catch (err) { setError(err.message); }
-  };
+ const openEvidence = async (claimId, kind) => {
+  try {
+    setError('');
+
+    const blob = await getClaimFileUrl(
+      claimId,
+      kind
+    );
+
+    const fileUrl = URL.createObjectURL(blob);
+
+    const newWindow = window.open(
+      fileUrl,
+      '_blank',
+      'noopener,noreferrer'
+    );
+
+    if (!newWindow) {
+      URL.revokeObjectURL(fileUrl);
+
+      throw new Error(
+        'The browser blocked the document window. Please allow pop-ups for this site.'
+      );
+    }
+
+    setTimeout(() => {
+      URL.revokeObjectURL(fileUrl);
+    }, 60_000);
+
+  } catch (err) {
+    console.error(
+      'Lawyer document view error:',
+      err
+    );
+
+    setError(
+      err.message ||
+      'Unable to open claim document.'
+    );
+  }
+};
 
   const review = async (claim, action) => {
     const promptText = action === 'APPROVE' ? 'Professional review remarks (optional).' : action === 'REQUEST_MORE_INFORMATION' ? 'What additional information or clearer evidence is required?' : 'State the concern or reason external resolution is required.';

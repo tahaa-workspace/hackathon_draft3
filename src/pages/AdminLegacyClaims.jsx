@@ -71,9 +71,44 @@ export default function AdminLegacyClaims() {
   useEffect(() => { load(); }, [load]);
 
   const openFile = async (claimId, kind) => {
-    try { const { url } = await getClaimFileUrl(claimId, kind); window.open(url, '_blank', 'noopener,noreferrer'); }
-    catch (err) { setError(err.message); }
-  };
+  try {
+    setError('');
+
+    const blob =
+      await getClaimFileUrl(
+        claimId,
+        kind
+      );
+
+    const fileUrl =
+      URL.createObjectURL(blob);
+
+    const newWindow =
+      window.open(
+        fileUrl,
+        '_blank',
+        'noopener,noreferrer'
+      );
+
+    if (!newWindow) {
+      URL.revokeObjectURL(fileUrl);
+
+      throw new Error(
+        'The browser blocked the document window. Please allow pop-ups for this site.'
+      );
+    }
+
+    setTimeout(() => {
+      URL.revokeObjectURL(fileUrl);
+    }, 60_000);
+
+  } catch (err) {
+    setError(
+      err.message ||
+        'Unable to open claim document.'
+    );
+  }
+};
 
   const review = async (claim, action) => {
     const defaultPrompt = action === 'FORWARD' ? 'Platform checks completed.' : action === 'REQUEST_CORRECTION' ? 'Specify what the Beneficiary must correct.' : action === 'HOLD' ? 'State the reason this claim is being held.' : 'State the platform reason for rejection.';
