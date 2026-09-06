@@ -21,6 +21,7 @@ import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLegacyClaims from './pages/AdminLegacyClaims';
 import OwnerDashboard from './pages/OwnerDashboard';
+import OwnerVault from './pages/OwnerVault';
 import BeneficiaryDashboard from './pages/BeneficiaryDashboard';
 import LawyerDashboard from './pages/LawyerDashboard';
 import Profile from './pages/Profile';
@@ -167,6 +168,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/owner/vault"
+            element={
+              <ProtectedRoute allowedRoles={['OWNER']}>
+                <OwnerVault />
               </ProtectedRoute>
             }
           />
