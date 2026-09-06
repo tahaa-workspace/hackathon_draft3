@@ -10,6 +10,24 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
+const RECORD_TYPES = [
+  {
+    value: "GENERAL",
+    label: "General",
+    helper: "Personal, legal, family or other general vault records",
+  },
+  {
+    value: "ASSET",
+    label: "Asset",
+    helper: "Property, insurance, investment or ownership-related records",
+  },
+  {
+    value: "LIABILITY",
+    label: "Liability",
+    helper: "Loan, EMI, credit or other obligation-related records",
+  },
+];
+
 const CATEGORIES = [
   "Personal",
   "Financial",
@@ -42,16 +60,14 @@ export default function UploadDocument({
   const fileInputRef = useRef(null);
 
   const [title, setTitle] = useState("");
-  const [category, setCategory] =
-    useState("Personal");
+  const [recordType, setRecordType] = useState("GENERAL");
+  const [category, setCategory] = useState("Personal");
 
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] =
-    useState("");
+  const [messageType, setMessageType] = useState("");
 
-  const [uploading, setUploading] =
-    useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const chooseFile = () => {
     fileInputRef.current?.click();
@@ -80,25 +96,19 @@ export default function UploadDocument({
     setMessageType("");
 
     if (!title.trim()) {
-      setMessage(
-        "Please enter a document title."
-      );
+      setMessage("Please enter a document title.");
       setMessageType("error");
       return;
     }
 
     if (!file) {
-      setMessage(
-        "Please select a document to upload."
-      );
+      setMessage("Please select a document to upload.");
       setMessageType("error");
       return;
     }
 
     if (!token) {
-      setMessage(
-        "You must be logged in to upload a document."
-      );
+      setMessage("You must be logged in to upload a document.");
       setMessageType("error");
       return;
     }
@@ -108,51 +118,30 @@ export default function UploadDocument({
 
       const formData = new FormData();
 
-      formData.append(
-        "title",
-        title.trim()
-      );
+      formData.append("title", title.trim());
+      formData.append("recordType", recordType);
+      formData.append("category", category);
+      formData.append("file", file);
 
-      formData.append(
-        "category",
-        category
-      );
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-      formData.append(
-        "file",
-        file
-      );
-
-      const response = await fetch(
-        "/api/documents",
-        {
-          method: "POST",
-
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-
-          body: formData,
-        }
-      );
-
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message ||
-            "Upload failed."
-        );
+        throw new Error(data.message || "Upload failed.");
       }
 
-      setMessage(
-        "Document uploaded securely."
-      );
-
+      setMessage("Vault record uploaded securely.");
       setMessageType("success");
 
       setTitle("");
+      setRecordType("GENERAL");
       setCategory("Personal");
       setFile(null);
 
@@ -164,11 +153,7 @@ export default function UploadDocument({
         await onUploadSuccess();
       }
     } catch (error) {
-      setMessage(
-        error.message ||
-          "Unable to upload document."
-      );
-
+      setMessage(error.message || "Unable to upload document.");
       setMessageType("error");
     } finally {
       setUploading(false);
@@ -176,38 +161,48 @@ export default function UploadDocument({
   };
 
   return (
-    <form
-      onSubmit={handleUpload}
-      className="space-y-5"
-    >
-      {/* Title */}
+    <form onSubmit={handleUpload} className="space-y-5">
       <div>
-        <label
-          className="field-label"
-          htmlFor="document-title"
-        >
-          Document title
+        <label className="field-label" htmlFor="document-title">
+          Record title
         </label>
 
         <input
           id="document-title"
           type="text"
           className="field-input"
-          placeholder="Example: Property Agreement"
+          placeholder="Example: Property Agreement or Home Loan Statement"
           value={title}
-          onChange={(e) =>
-            setTitle(e.target.value)
-          }
+          onChange={(e) => setTitle(e.target.value)}
           required
         />
       </div>
 
-      {/* Category */}
       <div>
-        <label
-          className="field-label"
-          htmlFor="document-category"
+        <label className="field-label" htmlFor="document-record-type">
+          Record type
+        </label>
+
+        <select
+          id="document-record-type"
+          className="field-input"
+          value={recordType}
+          onChange={(e) => setRecordType(e.target.value)}
         >
+          {RECORD_TYPES.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+
+        <p className="mt-1.5 text-xs leading-5 text-ink-400">
+          {RECORD_TYPES.find((item) => item.value === recordType)?.helper}
+        </p>
+      </div>
+
+      <div>
+        <label className="field-label" htmlFor="document-category">
           Category
         </label>
 
@@ -215,41 +210,29 @@ export default function UploadDocument({
           id="document-category"
           className="field-input"
           value={category}
-          onChange={(e) =>
-            setCategory(
-              e.target.value
-            )
-          }
+          onChange={(e) => setCategory(e.target.value)}
         >
-          {CATEGORIES.map(
-            (item) => (
-              <option
-                key={item}
-                value={item}
-              >
-                {item}
-              </option>
-            )
-          )}
+          {CATEGORIES.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
         </select>
+
+        <p className="mt-1.5 text-xs leading-5 text-ink-400">
+          Record type describes whether this is an Asset, Liability or General record; Category describes its subject area.
+        </p>
       </div>
 
-      {/* File Selection */}
       <div>
-        <label className="field-label">
-          Select document
-        </label>
+        <label className="field-label">Select document</label>
 
         <input
           ref={fileInputRef}
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
           className="hidden"
-          onChange={(e) =>
-            handleFileChange(
-              e.target.files?.[0]
-            )
-          }
+          onChange={(e) => handleFileChange(e.target.files?.[0])}
         />
 
         {!file ? (
@@ -259,9 +242,7 @@ export default function UploadDocument({
             className="group flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50/60 px-6 py-9 text-center transition hover:border-brand-300 hover:bg-brand-50/40"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 transition group-hover:bg-brand-100">
-              <UploadCloud
-                size={22}
-              />
+              <UploadCloud size={22} />
             </span>
 
             <span className="mt-4 text-sm font-semibold text-ink-800">
@@ -269,19 +250,14 @@ export default function UploadDocument({
             </span>
 
             <span className="mt-1 max-w-sm text-xs leading-5 text-ink-400">
-              PDF, JPG, JPEG or PNG.
-              Your file will be
-              securely processed before
-              storage.
+              PDF, JPG, JPEG or PNG. Your file will be securely processed before storage.
             </span>
           </button>
         ) : (
           <div className="rounded-2xl border border-brand-100 bg-brand-50/50 p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-brand-700 shadow-sm">
-                <FileText
-                  size={19}
-                />
+                <FileText size={19} />
               </div>
 
               <div className="min-w-0 flex-1">
@@ -290,12 +266,8 @@ export default function UploadDocument({
                 </p>
 
                 <p className="mt-0.5 text-xs text-ink-400">
-                  {formatFileSize(
-                    file.size
-                  )}
-                  {file.type
-                    ? ` · ${file.type}`
-                    : ""}
+                  {formatFileSize(file.size)}
+                  {file.type ? ` · ${file.type}` : ""}
                 </p>
               </div>
 
@@ -312,7 +284,6 @@ export default function UploadDocument({
         )}
       </div>
 
-      {/* Security Note */}
       <div className="flex items-start gap-3 rounded-xl border border-green-100 bg-green-50 px-4 py-3">
         <ShieldCheck
           size={17}
@@ -321,63 +292,45 @@ export default function UploadDocument({
 
         <div>
           <p className="text-xs font-semibold text-green-800">
-            Secure document storage
+            Secure vault storage
           </p>
 
           <p className="mt-0.5 text-xs leading-5 text-green-700">
-            Your document is handled
-            through the protected owner
-            vault and is not directly
-            exposed through the frontend.
+            Asset, Liability and General classifications are stored as vault metadata. The underlying file continues through the same encrypted storage flow.
           </p>
         </div>
       </div>
 
-      {/* Message */}
       {message && (
         <div
           className={
-            messageType ===
-            "success"
+            messageType === "success"
               ? "alert-success flex items-center gap-2"
               : "alert-error flex items-center gap-2"
           }
         >
-          {messageType ===
-          "success" ? (
-            <CheckCircle2
-              size={16}
-            />
+          {messageType === "success" ? (
+            <CheckCircle2 size={16} />
           ) : (
-            <AlertCircle
-              size={16}
-            />
+            <AlertCircle size={16} />
           )}
 
           {message}
         </div>
       )}
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={uploading}
         className="btn-primary w-full !py-3"
       >
         {uploading ? (
-          <Loader2
-            size={17}
-            className="animate-spin"
-          />
+          <Loader2 size={17} className="animate-spin" />
         ) : (
-          <UploadCloud
-            size={17}
-          />
+          <UploadCloud size={17} />
         )}
 
-        {uploading
-          ? "Uploading securely..."
-          : "Upload Document"}
+        {uploading ? "Uploading securely..." : "Upload Vault Record"}
       </button>
     </form>
   );
