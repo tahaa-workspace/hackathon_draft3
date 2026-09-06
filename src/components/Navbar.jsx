@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Briefcase,
   Scale,
+  FolderLock,
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +41,7 @@ export default function Navbar() {
   const goToHome = () => navigate('/');
   const goToPassword = () => navigate('/change-password');
   const goToLegacyClaims = () => navigate('/admin/legacy-claims');
+  const goToOwnerVault = () => navigate('/owner/vault');
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/90 shadow-[0_8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl">
@@ -68,6 +70,16 @@ export default function Navbar() {
               className="group hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
             >
               <Scale size={16} /> Legacy Claims
+            </button>
+          )}
+
+          {user.role === 'OWNER' && (
+            <button
+              type="button"
+              onClick={goToOwnerVault}
+              className="group hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
+            >
+              <FolderLock size={16} /> My Vault
             </button>
           )}
 
@@ -137,6 +149,11 @@ export default function Navbar() {
           {user.role === 'ADMIN' && (
             <button type="button" onClick={goToLegacyClaims} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700">
               <Scale size={14} /> Legacy Claims
+            </button>
+          )}
+          {user.role === 'OWNER' && (
+            <button type="button" onClick={goToOwnerVault} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700">
+              <FolderLock size={14} /> My Vault
             </button>
           )}
           <button type="button" onClick={goToPassword} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700">
