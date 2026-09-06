@@ -93,6 +93,38 @@ async function populatedClaim(query) {
     .populate('assignedLawyerId', 'name username email role lawyerProfile');
 }
 
+function assignedRecordPayload(doc) {
+  return {
+    id: doc._id.toString(),
+    title: doc.title,
+    recordType: doc.recordType || 'GENERAL',
+    category: doc.category,
+    originalName: doc.originalName,
+    fileType: doc.fileType,
+    fileSize: doc.fileSize,
+  };
+}
+
+async function enrichClaimWithAssignedRecords(claim) {
+  const assignedDocuments = await Document.find({
+    ownerId: claim.ownerId?._id || claim.ownerId,
+    assignedBeneficiaries: claim.beneficiaryId?._id || claim.beneficiaryId,
+  }).select('title recordType category originalName fileType fileSize');
+
+  const assignedRecords = assignedDocuments.map(assignedRecordPayload);
+  return {
+    ...claimPayload(claim),
+    assignedRecords,
+    assignedDocuments: assignedRecords,
+    recordSummary: {
+      total: assignedRecords.length,
+      assets: assignedRecords.filter((record) => record.recordType === 'ASSET').length,
+      liabilities: assignedRecords.filter((record) => record.recordType === 'LIABILITY').length,
+      general: assignedRecords.filter((record) => (record.recordType || 'GENERAL') === 'GENERAL').length,
+    },
+  };
+}
+
 async function destroyUpload(uploaded) {
   if (!uploaded?.public_id) return;
   await cloudinary.uploader.destroy(uploaded.public_id, {
@@ -131,7 +163,7 @@ export async function createLegacyClaim(req, res) {
   });
   if (assignedCount === 0) {
     return res.status(400).json({
-      message: 'No Owner-assigned documents exist for this beneficiary, so a Legacy Access Claim cannot be created yet.',
+      message: 'No Owner-assigned records exist for this beneficiary, so a Legacy Access Claim cannot be created yet.',
     });
   }
 
@@ -178,7 +210,7 @@ export async function createLegacyClaim(req, res) {
     const populated = await populatedClaim(LegacyClaim.findById(claim._id));
     return res.status(201).json({
       message: 'Legacy Access Claim submitted for administrator review.',
-      claim: claimPayload(populated),
+      claim: await enrichClaimWithAssignedRecords(populated),
     });
   } catch (error) {
     await Promise.all(Object.values(uploads).map(destroyUpload));
@@ -196,7 +228,8 @@ export async function listMyLegacyClaims(req, res) {
 
 export async function listAdminLegacyClaims(req, res) {
   const claims = await populatedClaim(LegacyClaim.find({}).sort({ createdAt: -1 }));
-  return res.status(200).json({ claims: claims.map(claimPayload) });
+  const enriched = await Promise.all(claims.map(enrichClaimWithAssignedRecords));
+  return res.status(200).json({ claims: enriched });
 }
 
 export async function listApprovedLawyers(req, res) {
@@ -226,7 +259,7 @@ export async function adminReviewClaim(req, res) {
   if (action === 'FORWARD') {
     if (!validLink || assignedCount === 0 || !claim.deathCertificate?.publicId || !claim.identityProof?.publicId) {
       return res.status(400).json({
-        message: 'Platform checks failed: verify Owner-Beneficiary link, assigned documents, death certificate, and identity proof.',
+        message: 'Platform checks failed: verify Owner-Beneficiary link, assigned records, death certificate, and identity proof.',
       });
     }
     claim.status = 'LEGACY_ACCESS_REQUESTED';
@@ -248,7 +281,7 @@ export async function adminReviewClaim(req, res) {
   await claim.save();
 
   const populated = await populatedClaim(LegacyClaim.findById(claim._id));
-  return res.status(200).json({ message: 'Admin review updated.', claim: claimPayload(populated) });
+  return res.status(200).json({ message: 'Admin review updated.', claim: await enrichClaimWithAssignedRecords(populated) });
 }
 
 export async function assignClaimLawyer(req, res) {
@@ -267,35 +300,14 @@ export async function assignClaimLawyer(req, res) {
   await claim.save();
 
   const populated = await populatedClaim(LegacyClaim.findById(claim._id));
-  return res.status(200).json({ message: 'Claim assigned to Lawyer.', claim: claimPayload(populated) });
+  return res.status(200).json({ message: 'Claim assigned to Lawyer.', claim: await enrichClaimWithAssignedRecords(populated) });
 }
 
 export async function listLawyerClaims(req, res) {
   const claims = await populatedClaim(
     LegacyClaim.find({ assignedLawyerId: req.user.id }).sort({ updatedAt: -1 })
   );
-
-  const enriched = await Promise.all(
-    claims.map(async (claim) => {
-      const assignedDocuments = await Document.find({
-        ownerId: claim.ownerId?._id || claim.ownerId,
-        assignedBeneficiaries: claim.beneficiaryId?._id || claim.beneficiaryId,
-      }).select('title category originalName fileType fileSize');
-
-      return {
-        ...claimPayload(claim),
-        assignedDocuments: assignedDocuments.map((doc) => ({
-          id: doc._id.toString(),
-          title: doc.title,
-          category: doc.category,
-          originalName: doc.originalName,
-          fileType: doc.fileType,
-          fileSize: doc.fileSize,
-        })),
-      };
-    })
-  );
-
+  const enriched = await Promise.all(claims.map(enrichClaimWithAssignedRecords));
   return res.status(200).json({ claims: enriched });
 }
 
@@ -328,7 +340,7 @@ export async function lawyerReviewClaim(req, res) {
   await claim.save();
 
   const populated = await populatedClaim(LegacyClaim.findById(claim._id));
-  return res.status(200).json({ message: 'Lawyer review updated.', claim: claimPayload(populated) });
+  return res.status(200).json({ message: 'Lawyer review updated.', claim: await enrichClaimWithAssignedRecords(populated) });
 }
 
 export async function getClaimFileUrl(req, res) {
