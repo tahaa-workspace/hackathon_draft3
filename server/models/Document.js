@@ -14,6 +14,15 @@ const documentSchema = new mongoose.Schema(
             trim: true,
         },
 
+        // High-level vault classification. Existing records that pre-date this
+        // field are treated as GENERAL by Mongoose through the default value.
+        recordType: {
+            type: String,
+            enum: ["GENERAL", "ASSET", "LIABILITY"],
+            default: "GENERAL",
+            index: true,
+        },
+
         category: {
             type: String,
             required: true,
@@ -33,8 +42,6 @@ const documentSchema = new mongoose.Schema(
             required: true,
         },
 
-        // Prototype sharing rule: beneficiaries listed here can immediately
-        // view this document. Later this can be combined with legacy/release status.
         assignedBeneficiaries: [
             {
                 type: mongoose.Schema.Types.ObjectId,
