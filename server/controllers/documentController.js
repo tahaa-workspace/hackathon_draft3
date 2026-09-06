@@ -5,11 +5,19 @@ import LegacyClaim from "../models/LegacyClaim.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
+const RECORD_TYPES = ["GENERAL", "ASSET", "LIABILITY"];
+
+function normalizeRecordType(value) {
+    const normalized = String(value || "GENERAL").trim().toUpperCase();
+    return RECORD_TYPES.includes(normalized) ? normalized : null;
+}
+
 function documentPayload(document) {
     return {
         id: document._id.toString(),
         ownerId: document.ownerId.toString(),
         title: document.title,
+        recordType: document.recordType || "GENERAL",
         category: document.category,
         originalName: document.originalName,
         fileType: document.fileType,
@@ -31,6 +39,7 @@ function beneficiaryDocumentPayload(document) {
         ownerName: document.ownerId?.name || "Owner",
         ownerUsername: document.ownerId?.username || "",
         title: document.title,
+        recordType: document.recordType || "GENERAL",
         category: document.category,
         originalName: document.originalName,
         fileType: document.fileType,
@@ -177,10 +186,17 @@ export const uploadDocument = async (req, res) => {
         }
 
         const { title, category } = req.body;
+        const recordType = normalizeRecordType(req.body.recordType);
 
         if (!title || !category) {
             return res.status(400).json({
                 message: "Title and category are required.",
+            });
+        }
+
+        if (!recordType) {
+            return res.status(400).json({
+                message: "Record type must be GENERAL, ASSET, or LIABILITY.",
             });
         }
 
@@ -192,6 +208,7 @@ export const uploadDocument = async (req, res) => {
         const document = await Document.create({
             ownerId: req.user.id,
             title,
+            recordType,
             category,
             originalName: req.file.originalname,
             assignedBeneficiaries: [],
@@ -211,7 +228,7 @@ export const uploadDocument = async (req, res) => {
         });
 
         return res.status(201).json({
-            message: "Document encrypted and uploaded securely.",
+            message: "Vault record encrypted and uploaded securely.",
             document: documentPayload(document),
         });
     } catch (error) {
