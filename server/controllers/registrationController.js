@@ -6,7 +6,13 @@ import RegistrationPhoneVerification from '../models/RegistrationPhoneVerificati
 import cloudinary from '../config/cloudinary.js';
 
 const SALT_ROUNDS = 12;
-const DEMO_MOBILE = '+919054559272';
+const DEMO_MOBILES = new Set([
+  '+919054559272',
+  '+916352522036',
+  '+918238387089',
+  '+919106882453',
+  '+919316744194',
+]);
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const PHONE_PROOF_EXPIRY_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -20,6 +26,14 @@ function normalizePhone(value) {
   if (/^\+[1-9]\d{7,14}$/.test(raw)) return raw;
 
   return null;
+}
+
+function isAllowedDemoMobile(phone) {
+  return DEMO_MOBILES.has(phone);
+}
+
+function displayPhone(phone) {
+  return phone.startsWith('+91') ? phone.slice(3) : phone;
 }
 
 function hashToken(token) {
@@ -71,20 +85,24 @@ export async function requestRegistrationOTP(req, res) {
       });
     }
 
-    if (phone !== DEMO_MOBILE) {
+    if (!isAllowedDemoMobile(phone)) {
       return res.status(400).json({
-        message: 'Demo mode: please use mobile number 9054559272.',
+        message:
+          'Demo mode: please use one of the configured test mobile numbers shown on the registration page.',
       });
     }
 
     const existing = await User.findOne({ phone }).lean();
     if (existing) {
       return res.status(409).json({
-        message: 'An account with this mobile number already exists. Delete the previous demo owner before testing registration again.',
+        message:
+          'An account with this mobile number already exists. Use another configured demo number or delete the previous demo owner before testing again.',
       });
     }
 
-    let session = await RegistrationPhoneVerification.findOne({ phone }).select('+otpHash +tokenHash');
+    let session = await RegistrationPhoneVerification.findOne({ phone }).select(
+      '+otpHash +tokenHash'
+    );
     const now = Date.now();
 
     if (
@@ -92,7 +110,9 @@ export async function requestRegistrationOTP(req, res) {
       now - new Date(session.lastSentAt).getTime() < OTP_RESEND_COOLDOWN_MS
     ) {
       const retryAfterSeconds = Math.ceil(
-        (OTP_RESEND_COOLDOWN_MS - (now - new Date(session.lastSentAt).getTime())) / 1000
+        (OTP_RESEND_COOLDOWN_MS -
+          (now - new Date(session.lastSentAt).getTime())) /
+          1000
       );
 
       return res.status(429).json({
@@ -129,7 +149,7 @@ export async function requestRegistrationOTP(req, res) {
 
     console.log('\n===============================================');
     console.log('NEXT GEN VAULT - DEMO REGISTRATION OTP');
-    console.log(`Mobile: 9054559272`);
+    console.log(`Mobile: ${displayPhone(phone)}`);
     console.log(`OTP: ${otp}`);
     console.log('Valid for: 5 minutes');
     console.log('===============================================\n');
@@ -157,17 +177,22 @@ export async function verifyRegistrationOTP(req, res) {
       return res.status(400).json({ message: 'Enter a valid mobile number.' });
     }
 
-    if (phone !== DEMO_MOBILE) {
+    if (!isAllowedDemoMobile(phone)) {
       return res.status(400).json({
-        message: 'Demo mode: please use mobile number 9054559272.',
+        message:
+          'Demo mode: please use one of the configured test mobile numbers shown on the registration page.',
       });
     }
 
     if (!/^\d{6}$/.test(otp)) {
-      return res.status(400).json({ message: 'Enter the 6-digit OTP shown in the backend terminal.' });
+      return res.status(400).json({
+        message: 'Enter the 6-digit OTP shown in the backend terminal.',
+      });
     }
 
-    const session = await RegistrationPhoneVerification.findOne({ phone }).select('+otpHash +tokenHash');
+    const session = await RegistrationPhoneVerification.findOne({ phone }).select(
+      '+otpHash +tokenHash'
+    );
 
     if (!session || !session.otpHash) {
       return res.status(404).json({
@@ -254,9 +279,10 @@ export async function registerOwner(req, res) {
     });
   }
 
-  if (phone !== DEMO_MOBILE) {
+  if (!isAllowedDemoMobile(phone)) {
     return res.status(400).json({
-      message: 'Demo mode: please use mobile number 9054559272.',
+      message:
+        'Demo mode: please use one of the configured test mobile numbers shown on the registration page.',
     });
   }
 
