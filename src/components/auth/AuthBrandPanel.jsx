@@ -3,7 +3,6 @@ import {
   FileText,
   KeyRound,
   LockKeyhole,
-  ShieldCheck,
   UserRoundCheck,
 } from "lucide-react";
 
@@ -22,19 +21,23 @@ export default function AuthBrandPanel() {
       {/* Top logo */}
       <div className="relative z-10 flex items-center gap-3">
 
-        <div className="auth-logo-box">
-          <ShieldCheck size={21} />
-        </div>
+       <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-xl shadow-black/15 ring-1 ring-white/20">
+  <img
+    src="/nextgen-vault-logo.png"
+    alt="NextGen Vault"
+    className="h-11 w-11 object-contain"
+  />
+</div>
 
-        <div>
-          <p className="text-base font-bold text-white">
-            Digital Legacy
-          </p>
+<div>
+  <p className="text-lg font-bold tracking-[-0.02em] text-white">
+    NextGen Vault
+  </p>
 
-          <p className="text-xs text-brand-200">
-            Next Gen Vault
-          </p>
-        </div>
+  <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-brand-200">
+    Digital Asset Custody
+  </p>
+</div>
 
       </div>
 
@@ -109,9 +112,14 @@ export default function AuthBrandPanel() {
 
               <div className="flex items-center gap-3">
 
-                <div className="auth-mini-logo">
-                  <ShieldCheck size={16} />
-                </div>
+               <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm">
+  <img
+    src="/nextgen-vault-logo.png"
+    alt=""
+    aria-hidden="true"
+    className="h-7 w-7 object-contain"
+  />
+</div>
 
                 <div>
                   <p className="text-xs font-semibold text-white">

@@ -13,6 +13,7 @@ import ProtectedRoute, {
 } from './components/ProtectedRoute';
 
 import LandingPage from './pages/LandingPage';
+import AboutUs from './pages/AboutUs';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import Register from './pages/Register';
@@ -100,6 +101,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutUs />} />
 
           <Route
             path="/login"
@@ -137,17 +139,12 @@ export default function App() {
             }
           />
 
-          <Route
-            path="/pending-approval"
-            element={<PendingApproval />}
-          />
+          <Route path="/pending-approval" element={<PendingApproval />} />
 
           <Route
             path="/change-password"
             element={
-              <ProtectedRoute
-                allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}
-              >
+              <ProtectedRoute allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}>
                 <ChangePassword />
               </ProtectedRoute>
             }
@@ -156,9 +153,7 @@ export default function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute
-                allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}
-              >
+              <ProtectedRoute allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}>
                 <Profile />
               </ProtectedRoute>
             }
@@ -218,10 +213,7 @@ export default function App() {
             }
           />
 
-          <Route
-            path="*"
-            element={<SessionAwareRedirect />}
-          />
+          <Route path="*" element={<SessionAwareRedirect />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

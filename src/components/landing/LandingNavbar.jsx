@@ -3,7 +3,6 @@ import {
   ArrowRight,
   LayoutDashboard,
   LogIn,
-  Shield,
   UserPlus,
 } from "lucide-react";
 
@@ -11,13 +10,15 @@ const ROLE_LABELS = {
   ADMIN: "Administrator",
   OWNER: "Owner",
   BENEFICIARY: "Beneficiary",
+  LAWYER: "Lawyer",
 };
 
 const NAV_ITEMS = [
-  { label: "Problem", href: "#problem" },
-  { label: "Features", href: "#features" },
-  { label: "How it works", href: "#how-it-works" },
-  { label: "Security", href: "#security" },
+  { label: "Problem", href: "/#problem" },
+  { label: "Features", href: "/#features" },
+  { label: "How it works", href: "/#how-it-works" },
+  { label: "Security", href: "/#security" },
+  { label: "About Us", href: "/about" },
 ];
 
 export default function LandingNavbar({
@@ -31,11 +32,11 @@ export default function LandingNavbar({
   const { scrollYProgress } = useScroll();
 
   return (
-  <header className="fixed inset-x-0 top-0 z-50 border-b border-white/70 bg-white/80 shadow-[0_10px_35px_rgba(15,23,42,0.06)] backdrop-blur-2xl">
-  <motion.div
-    className="absolute inset-x-0 top-0 h-[2px] origin-left bg-gradient-to-r from-brand-500 via-accent-violet to-accent-cyan"
-    style={{ scaleX: scrollYProgress }}
-  />
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/70 bg-white/80 shadow-[0_10px_35px_rgba(15,23,42,0.06)] backdrop-blur-2xl">
+      <motion.div
+        className="absolute inset-x-0 top-0 h-[2px] origin-left bg-gradient-to-r from-brand-500 via-accent-violet to-accent-cyan"
+        style={{ scaleX: scrollYProgress }}
+      />
 
       <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <button
@@ -44,17 +45,21 @@ export default function LandingNavbar({
           className="group flex items-center gap-3 text-left"
           aria-label="Go to landing page"
         >
-          <span className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-600 to-accent-violet text-white shadow-lg shadow-brand-600/20 transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-105">
-            <Shield size={19} />
-            <span className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 opacity-0 transition duration-500 group-hover:opacity-100" />
+          <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-brand-600/10 ring-1 ring-ink-100 transition duration-300 group-hover:-translate-y-0.5 group-hover:scale-105">
+            <img
+              src="/nextgen-vault-logo.png"
+              alt="NextGen Vault"
+              className="h-10 w-10 object-contain"
+            />
+            <span className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 transition duration-500 group-hover:opacity-100" />
           </span>
 
           <span className="leading-tight">
-            <span className="block text-sm font-bold text-ink-900">
-              Digital Legacy
+            <span className="block text-[15px] font-bold tracking-[-0.02em] text-ink-900">
+              NextGen Vault
             </span>
-            <span className="hidden text-xs font-medium text-ink-400 sm:block">
-              Next Gen Vault
+            <span className="hidden text-[10px] font-medium uppercase tracking-[0.08em] text-ink-400 sm:block">
+              Digital Asset Custody
             </span>
           </span>
         </button>
