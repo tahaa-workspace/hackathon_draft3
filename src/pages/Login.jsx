@@ -9,6 +9,7 @@ import {
   AlertCircle,
   ArrowRight,
   BriefcaseBusiness,
+  CheckCircle2,
   Loader2,
   LogIn,
   Mail,
@@ -37,6 +38,9 @@ export default function Login() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const passwordResetSuccess =
+    location.state?.passwordResetSuccess || "";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -123,6 +127,14 @@ export default function Login() {
         </div>
 
 
+        {passwordResetSuccess && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+            <CheckCircle2 size={17} className="mt-0.5 shrink-0" />
+            <p className="text-xs leading-5">{passwordResetSuccess}</p>
+          </div>
+        )}
+
+
         {/* Error */}
         <AnimatePresence mode="wait">
 
@@ -185,18 +197,29 @@ export default function Login() {
           />
 
 
-          <PasswordInput
-            id="password"
-            label="Password"
-            value={password}
-            onChange={(e) =>
-              setPassword(e.target.value)
-            }
-            placeholder="Enter your password"
-            autoComplete="current-password"
-            disabled={loading}
-            required
-          />
+          <div>
+            <PasswordInput
+              id="password"
+              label="Password"
+              value={password}
+              onChange={(e) =>
+                setPassword(e.target.value)
+              }
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              disabled={loading}
+              required
+            />
+
+            <div className="mt-2 flex justify-end">
+              <Link
+                to="/forgot-password"
+                className="text-xs font-semibold text-brand-700 transition hover:text-brand-800"
+              >
+                Forgot password?
+              </Link>
+            </div>
+          </div>
 
 
           {/* Small security information */}
