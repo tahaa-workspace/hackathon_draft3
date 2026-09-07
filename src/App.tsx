@@ -14,6 +14,7 @@ import ProtectedRoute, {
 
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import Register from './pages/Register';
 import LawyerRegister from './pages/LawyerRegister';
 import PendingApproval from './pages/PendingApproval';
@@ -105,6 +106,15 @@ export default function App() {
             element={
               <PublicOnlyRoute>
                 <Login />
+              </PublicOnlyRoute>
+            }
+          />
+
+          <Route
+            path="/forgot-password"
+            element={
+              <PublicOnlyRoute>
+                <ForgotPassword />
               </PublicOnlyRoute>
             }
           />
