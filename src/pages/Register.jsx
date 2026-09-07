@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Loader2, CheckCircle2, Upload, FileText, Smartphone } from 'lucide-react';
+import {
+  UserPlus,
+  Loader2,
+  CheckCircle2,
+  Upload,
+  FileText,
+  Smartphone,
+  Mail,
+} from 'lucide-react';
 import {
   registerUser,
   sendRegistrationOTP,
   verifyRegistrationOTP,
+  sendRegistrationEmailOTP,
+  verifyRegistrationEmailOTP,
 } from '../services/authService';
 import AuthShell from "../components/auth/AuthShell";
 
@@ -36,6 +46,16 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpLoading, setEmailOtpLoading] = useState(false);
+  const [emailVerifyLoading, setEmailVerifyLoading] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailVerificationToken, setEmailVerificationToken] = useState('');
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [emailResendIn, setEmailResendIn] = useState(0);
+  const [emailOtpMessage, setEmailOtpMessage] = useState('');
+
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
@@ -56,9 +76,18 @@ export default function Register() {
     return () => window.clearInterval(timer);
   }, [resendIn]);
 
+  useEffect(() => {
+    if (emailResendIn <= 0) return undefined;
+
+    const timer = window.setInterval(() => {
+      setEmailResendIn((value) => Math.max(0, value - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [emailResendIn]);
+
   const update = (key) => (e) => {
     const value = e.target.value;
-
     setForm((f) => ({ ...f, [key]: value }));
 
     if (key === 'phone' && value !== verifiedPhone) {
@@ -68,6 +97,68 @@ export default function Register() {
       setOtpSent(false);
       setOtpMessage('');
       setResendIn(0);
+    }
+
+    if (key === 'email' && value !== verifiedEmail) {
+      setEmailVerified(false);
+      setEmailVerificationToken('');
+      setEmailOtp('');
+      setEmailOtpSent(false);
+      setEmailOtpMessage('');
+      setEmailResendIn(0);
+    }
+  };
+
+  const handleSendEmailOtp = async () => {
+    setError('');
+    setEmailOtpMessage('');
+
+    if (!form.email.trim()) {
+      setError('Please enter your email address first.');
+      return;
+    }
+
+    setEmailOtpLoading(true);
+
+    try {
+      const result = await sendRegistrationEmailOTP(form.email.trim());
+      setEmailOtpSent(true);
+      setEmailOtp('');
+      setEmailVerified(false);
+      setEmailVerificationToken('');
+      setVerifiedEmail('');
+      setEmailResendIn(RESEND_SECONDS);
+      setEmailOtpMessage(result.message || 'OTP sent to your email address.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEmailOtpLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    setError('');
+    setEmailOtpMessage('');
+
+    if (!emailOtp.trim()) {
+      setError('Please enter the OTP sent to your email address.');
+      return;
+    }
+
+    setEmailVerifyLoading(true);
+
+    try {
+      const result = await verifyRegistrationEmailOTP(form.email.trim(), emailOtp.trim());
+      setEmailVerified(true);
+      setEmailVerificationToken(result.verificationToken);
+      setVerifiedEmail(form.email);
+      setEmailOtpMessage(result.message || 'Email address verified successfully.');
+    } catch (err) {
+      setEmailVerified(false);
+      setEmailVerificationToken('');
+      setError(err.message);
+    } finally {
+      setEmailVerifyLoading(false);
     }
   };
 
@@ -154,6 +245,10 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
+    if (!emailVerified || !emailVerificationToken) {
+      setError('Please verify your email address before submitting registration.');
+      return;
+    }
     if (!phoneVerified || !phoneVerificationToken) {
       setError('Please verify your mobile number before submitting registration.');
       return;
@@ -175,6 +270,7 @@ export default function Register() {
     try {
       await registerUser({
         ...form,
+        emailVerificationToken,
         phoneVerificationToken,
         aadhaar,
       });
@@ -193,7 +289,7 @@ export default function Register() {
           <div className="alert-success flex items-start gap-3">
             <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
             <span>
-              Your mobile number has been verified and your registration and Aadhaar document have been received.
+              Your email and mobile number have been verified, and your registration and Aadhaar document have been received.
               An administrator will review your identity document and approve or reject your owner account.
             </span>
           </div>
@@ -213,7 +309,7 @@ export default function Register() {
   return (
     <AuthShell
       title="Create an owner account"
-      subtitle="Verify your mobile number, then submit Aadhaar for administrator approval"
+      subtitle="Verify your email and mobile number, then submit Aadhaar for administrator approval"
       footer={
         <p className="text-sm text-ink-500">
           Already approved?{' '}
@@ -243,17 +339,75 @@ export default function Register() {
           />
         </div>
 
-        <div>
+        <div className="rounded-xl border border-ink-200 bg-ink-50/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Mail size={17} className="text-brand-700" />
+            <p className="text-sm font-semibold text-ink-800">Email verification</p>
+          </div>
+
           <label className="field-label" htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            className="field-input"
-            value={form.email}
-            onChange={update('email')}
-            autoComplete="email"
-            required
-          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="email"
+              type="email"
+              className="field-input flex-1"
+              value={form.email}
+              onChange={update('email')}
+              autoComplete="email"
+              disabled={emailVerified}
+              required
+            />
+            <button
+              type="button"
+              className="btn-secondary whitespace-nowrap"
+              onClick={handleSendEmailOtp}
+              disabled={emailOtpLoading || emailVerified || (emailOtpSent && emailResendIn > 0)}
+            >
+              {emailOtpLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+              {emailOtpSent
+                ? (emailResendIn > 0 ? `Resend in ${emailResendIn}s` : 'Resend OTP')
+                : 'Send OTP'}
+            </button>
+          </div>
+
+          {emailOtpSent && !emailVerified && (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                id="registration-email-otp"
+                type="text"
+                inputMode="numeric"
+                className="field-input flex-1"
+                value={emailOtp}
+                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter 6-digit email OTP"
+                autoComplete="one-time-code"
+              />
+              <button
+                type="button"
+                className="btn-primary whitespace-nowrap"
+                onClick={handleVerifyEmailOtp}
+                disabled={emailVerifyLoading || emailOtp.length !== 6}
+              >
+                {emailVerifyLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                Verify Email
+              </button>
+            </div>
+          )}
+
+          {emailVerified && (
+            <div className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700">
+              <CheckCircle2 size={17} />
+              Email address verified
+            </div>
+          )}
+
+          {emailOtpMessage && (
+            <p className="mt-2 text-xs text-ink-600">{emailOtpMessage}</p>
+          )}
+
+          <p className="mt-2 text-xs text-ink-500">
+            A 6-digit OTP is sent to this email address and expires in 5 minutes.
+          </p>
         </div>
 
         <div className="rounded-xl border border-ink-200 bg-ink-50/40 p-4">
@@ -383,7 +537,11 @@ export default function Register() {
           </p>
         </div>
 
-        <button type="submit" className="btn-primary w-full" disabled={loading || !phoneVerified}>
+        <button
+          type="submit"
+          className="btn-primary w-full"
+          disabled={loading || !emailVerified || !phoneVerified}
+        >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
           {loading ? 'Submitting…' : 'Submit registration request'}
         </button>
