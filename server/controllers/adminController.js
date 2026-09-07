@@ -281,7 +281,7 @@ export async function rejectUser(req, res) {
       ? req.body.reason.trim()
       : '';
 
-  const user = await User.findById(id).select('-passwordHash');
+  const user = await User.findById(id);
 
   if (!user) {
     return res.status(404).json({
@@ -296,79 +296,135 @@ export async function rejectUser(req, res) {
   }
 
   if (!['OWNER', 'LAWYER'].includes(user.role)) {
-    return res.status(400).json({ message: 'This account does not use the registration approval workflow.' });
+    return res.status(400).json({
+      message:
+        'This account does not use the registration approval workflow.',
+    });
   }
 
-  const verificationDocument = user.role === 'LAWYER'
-    ? user.lawyerProfile?.credentialDocument
-    : user.aadhaarDocument;
+  const roleLabel =
+    user.role === 'LAWYER'
+      ? 'Lawyer'
+      : 'Owner';
 
-  const publicId = verificationDocument?.publicId;
-  const resourceType = verificationDocument?.resourceType || 'image';
+  /*
+  =========================================
+  GET VERIFICATION DOCUMENT
+  =========================================
+  */
+
+  const verificationDocument =
+    user.role === 'LAWYER'
+      ? user.lawyerProfile?.credentialDocument
+      : user.aadhaarDocument;
+
+  const publicId =
+    verificationDocument?.publicId;
+
+  const resourceType =
+    verificationDocument?.resourceType ||
+    'image';
+
+  /*
+  =========================================
+  DELETE VERIFICATION FILE FROM CLOUDINARY
+  =========================================
+  */
 
   if (publicId) {
     try {
-      const deletionResult = await cloudinary.uploader.destroy(publicId, {
-        resource_type: resourceType,
-        type: 'authenticated',
-        invalidate: true,
-      });
-
-      if (deletionResult.result !== 'ok' && deletionResult.result !== 'not found') {
-        console.error('Unexpected Cloudinary deletion result:', {
-          userId: user._id.toString(),
+      const deletionResult =
+        await cloudinary.uploader.destroy(
           publicId,
-          resourceType,
-          result: deletionResult.result,
-        });
+          {
+            resource_type:
+              resourceType,
+
+            type:
+              'authenticated',
+
+            invalidate:
+              true,
+          }
+        );
+
+      if (
+        deletionResult.result !== 'ok' &&
+        deletionResult.result !== 'not found'
+      ) {
+        console.error(
+          'Unexpected Cloudinary deletion result:',
+          {
+            userId:
+              user._id.toString(),
+
+            publicId,
+
+            resourceType,
+
+            result:
+              deletionResult.result,
+          }
+        );
 
         return res.status(502).json({
-          message: 'Unable to remove the verification document from cloud storage. User was not rejected.',
+          message:
+            'Unable to remove the verification document from cloud storage. Registration was not rejected.',
         });
       }
+
     } catch (error) {
-      console.error('Cloudinary verification document deletion failed:', {
-        userId: user._id.toString(),
-        publicId,
-        resourceType,
-        error: error.message,
-      });
+      console.error(
+        'Cloudinary verification document deletion failed:',
+        {
+          userId:
+            user._id.toString(),
+
+          publicId,
+
+          resourceType,
+
+          error:
+            error.message,
+        }
+      );
 
       return res.status(502).json({
-        message: 'Unable to remove the verification document from cloud storage. User was not rejected. Please try again.',
+        message:
+          'Unable to remove the verification document from cloud storage. Registration was not rejected. Please try again.',
       });
     }
   }
 
-  if (user.role === 'LAWYER') {
-    user.lawyerProfile.credentialDocument = {
-      publicId: null,
-      resourceType: null,
-      originalName: null,
-      mimeType: null,
-      fileSize: null,
-    };
-  } else {
-    user.aadhaarDocument = {
-      publicId: null,
-      resourceType: null,
-      originalName: null,
-      mimeType: null,
-      fileSize: null,
-    };
-  }
+  /*
+  =========================================
+  DELETE REJECTED REGISTRATION FROM MONGODB
+  =========================================
 
-  user.status = 'REJECTED';
-  user.verification = {
-    reviewedBy: req.user.id,
-    reviewedAt: new Date(),
-    rejectionReason: reason || null,
-  };
+  The registration never became an active
+  account, so its username/email should become
+  available again.
+  */
 
-  await user.save();
+  await User.deleteOne({
+    _id: user._id,
+  });
 
   return res.status(200).json({
-    message: `${user.role === 'LAWYER' ? 'Lawyer' : 'Owner'} registration rejected and verification document deleted successfully.`,
-    user: registrationPayload(user),
+    message:
+      `${roleLabel} registration rejected. The verification document and pending registration were deleted. The username and email can now be used for a new registration.`,
+
+    rejected: true,
+
+    reason:
+      reason || null,
+
+    releasedCredentials: {
+      username:
+        user.username,
+
+      email:
+        user.email,
+    },
   });
 }
