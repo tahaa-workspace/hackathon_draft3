@@ -12,6 +12,8 @@ import {
     registerOwner,
     requestRegistrationOTP,
     verifyRegistrationOTP,
+    requestRegistrationEmailOTP,
+    verifyRegistrationEmailOTP,
 } from "../controllers/registrationController.js";
 
 import {
@@ -39,6 +41,16 @@ router.post(
 router.post(
     "/registration/verify-otp",
     verifyRegistrationOTP
+);
+
+router.post(
+    "/registration/email/send-otp",
+    requestRegistrationEmailOTP
+);
+
+router.post(
+    "/registration/email/verify-otp",
+    verifyRegistrationEmailOTP
 );
 
 router.post(
