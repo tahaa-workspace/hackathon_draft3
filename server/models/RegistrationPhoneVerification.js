@@ -11,10 +11,33 @@ const registrationPhoneVerificationSchema = new Schema(
       index: true,
       trim: true,
     },
+    otpHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    attempts: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    resendCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lastSentAt: {
+      type: Date,
+      default: null,
+    },
     tokenHash: {
       type: String,
-      required: true,
+      default: null,
       select: false,
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
     },
     expiresAt: {
       type: Date,
