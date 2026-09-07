@@ -83,7 +83,7 @@ export default function Register() {
       setPhoneVerificationToken('');
       setVerifiedPhone('');
       setResendIn(RESEND_SECONDS);
-      setOtpMessage(result.message || 'OTP sent successfully.');
+      setOtpMessage(result.message || 'Demo OTP generated. Check the backend terminal.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -96,7 +96,7 @@ export default function Register() {
     setOtpMessage('');
 
     if (!otp.trim()) {
-      setError('Please enter the OTP sent to your mobile number.');
+      setError('Please enter the OTP shown in the backend terminal.');
       return;
     }
 
@@ -264,7 +264,7 @@ export default function Register() {
               className="field-input flex-1"
               value={form.phone}
               onChange={update('phone')}
-              placeholder="9876543210"
+              placeholder="9054559272"
               autoComplete="tel"
               disabled={phoneVerified}
               required
@@ -288,15 +288,15 @@ export default function Register() {
                 inputMode="numeric"
                 className="field-input flex-1"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="Enter OTP"
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter 6-digit OTP"
                 autoComplete="one-time-code"
               />
               <button
                 type="button"
                 className="btn-primary whitespace-nowrap"
                 onClick={handleVerifyOtp}
-                disabled={verifyLoading || !otp}
+                disabled={verifyLoading || otp.length !== 6}
               >
                 {verifyLoading ? <Loader2 size={16} className="animate-spin" /> : null}
                 Verify OTP
@@ -316,7 +316,7 @@ export default function Register() {
           )}
 
           <p className="mt-2 text-xs text-ink-500">
-            Indian 10-digit mobile numbers are automatically sent using the +91 country code.
+            Demo mode: use mobile number 9054559272. The generated OTP is shown only in the backend terminal and expires in 5 minutes.
           </p>
         </div>
 
