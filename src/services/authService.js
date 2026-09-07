@@ -72,10 +72,26 @@ async function request(
    AUTHENTICATION
    ========================================================= */
 
+export async function sendRegistrationOTP(phone) {
+  return request('/auth/registration/send-otp', {
+    method: 'POST',
+    body: { phone },
+  });
+}
+
+export async function verifyRegistrationOTP(phone, otp) {
+  return request('/auth/registration/verify-otp', {
+    method: 'POST',
+    body: { phone, otp },
+  });
+}
+
 export async function registerUser({
   name,
   username,
   email,
+  phone,
+  phoneVerificationToken,
   password,
   confirmPassword,
   aadhaar,
@@ -85,6 +101,8 @@ export async function registerUser({
   formData.append('name', name);
   formData.append('username', username);
   formData.append('email', email);
+  formData.append('phone', phone);
+  formData.append('phoneVerificationToken', phoneVerificationToken);
   formData.append('password', password);
   formData.append(
     'confirmPassword',
