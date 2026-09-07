@@ -9,6 +9,12 @@ import {
     completePasswordChange,
 } from "../controllers/authController.js";
 
+import {
+    requestForgotPasswordOTP,
+    verifyForgotPasswordOTP,
+    completeForgotPasswordReset,
+} from "../controllers/forgotPasswordController.js";
+
 import protect from "../middleware/authMiddleware.js";
 import upload from "../middleware/uploadMiddleware.js";
 
@@ -42,6 +48,28 @@ LOGIN
 router.post(
     "/login",
     login
+);
+
+
+/*
+=========================================================
+FORGOT PASSWORD - PUBLIC RECOVERY FLOW
+=========================================================
+*/
+
+router.post(
+    "/forgot-password/request-otp",
+    requestForgotPasswordOTP
+);
+
+router.post(
+    "/forgot-password/verify-otp",
+    verifyForgotPasswordOTP
+);
+
+router.post(
+    "/forgot-password/reset",
+    completeForgotPasswordReset
 );
 
 
