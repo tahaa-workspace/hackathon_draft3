@@ -12,6 +12,7 @@ import ProtectedRoute, {
   homeForRole,
 } from './components/ProtectedRoute';
 
+import ContactUs from './pages/ContactUs';
 import LandingPage from './pages/LandingPage';
 import AboutUs from './pages/AboutUs';
 import Login from './pages/Login';
@@ -102,7 +103,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/about" element={<AboutUs />} />
-
+          <Route path="/contact" element={<ContactUs />} />
           <Route
             path="/login"
             element={

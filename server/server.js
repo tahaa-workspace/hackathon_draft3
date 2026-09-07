@@ -2,7 +2,7 @@ import 'dotenv/config';
 import documentRoutes from "./routes/documentRoutes.js";
 import express from 'express';
 import cors from 'cors';
-
+import contactRoutes from './routes/contactRoutes.js';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
@@ -21,7 +21,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/beneficiaries', beneficiaryRoutes);
 app.use("/api/documents", documentRoutes);
 app.use('/api/legacy-claims', legacyClaimRoutes);
-
+app.use('/api/contact', contactRoutes);
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found.' });
 });
