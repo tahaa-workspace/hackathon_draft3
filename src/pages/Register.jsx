@@ -249,24 +249,29 @@ export default function Register() {
       setError('Please verify your email address before submitting registration.');
       return;
     }
+
     if (!phoneVerified || !phoneVerificationToken) {
       setError('Please verify your mobile number before submitting registration.');
       return;
     }
+
     if (form.password !== form.confirmPassword) {
       setError('Password and confirm password do not match.');
       return;
     }
+
     if (form.password.length < 8) {
       setError('Password must be at least 8 characters long.');
       return;
     }
+
     if (!aadhaar) {
       setError('Please upload your Aadhaar card before submitting registration.');
       return;
     }
 
     setLoading(true);
+
     try {
       await registerUser({
         ...form,
@@ -274,6 +279,7 @@ export default function Register() {
         phoneVerificationToken,
         aadhaar,
       });
+
       setDone(true);
     } catch (err) {
       setError(err.message);
@@ -284,20 +290,32 @@ export default function Register() {
 
   if (done) {
     return (
-      <AuthShell title="Registration submitted" subtitle="Awaiting administrator verification">
+      <AuthShell
+        title="Registration submitted"
+        subtitle="Awaiting administrator verification"
+      >
         <div className="space-y-5">
           <div className="alert-success flex items-start gap-3">
             <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
             <span>
-              Your email and mobile number have been verified, and your registration and Aadhaar document have been received.
-              An administrator will review your identity document and approve or reject your owner account.
+              Your email and mobile number have been verified, and your registration
+              and Aadhaar document have been received. An administrator will review
+              your identity document and approve or reject your owner account.
             </span>
           </div>
+
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button className="btn-secondary flex-1" onClick={() => navigate('/pending-approval')}>
+            <button
+              className="btn-secondary flex-1"
+              onClick={() => navigate('/pending-approval')}
+            >
               View status
             </button>
-            <button className="btn-primary flex-1" onClick={() => navigate('/login')}>
+
+            <button
+              className="btn-primary flex-1"
+              onClick={() => navigate('/login')}
+            >
               Go to sign in
             </button>
           </div>
@@ -308,12 +326,16 @@ export default function Register() {
 
   return (
     <AuthShell
+      variant="wide"
       title="Create an owner account"
       subtitle="Verify your email and mobile number, then submit Aadhaar for administrator approval"
       footer={
         <p className="text-sm text-ink-500">
           Already approved?{' '}
-          <Link to="/login" className="font-semibold text-brand-700 hover:text-brand-800">
+          <Link
+            to="/login"
+            className="font-semibold text-brand-700 hover:text-brand-800"
+          >
             Sign in
           </Link>
         </p>
@@ -322,107 +344,161 @@ export default function Register() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <div className="alert-error">{error}</div>}
 
-        <div>
-          <label className="field-label" htmlFor="name">Full name</label>
-          <input id="name" className="field-input" value={form.name} onChange={update('name')} required />
-        </div>
+        <div className="registration-two-column">
+          <div>
+            <label className="field-label" htmlFor="name">
+              Full name
+            </label>
 
-        <div>
-          <label className="field-label" htmlFor="username">Username</label>
-          <input
-            id="username"
-            className="field-input"
-            value={form.username}
-            onChange={update('username')}
-            autoComplete="username"
-            required
-          />
-        </div>
-
-        <div className="rounded-xl border border-ink-200 bg-ink-50/40 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Mail size={17} className="text-brand-700" />
-            <p className="text-sm font-semibold text-ink-800">Email verification</p>
+            <input
+              id="name"
+              className="field-input"
+              value={form.name}
+              onChange={update('name')}
+              autoComplete="name"
+              required
+            />
           </div>
 
-          <label className="field-label" htmlFor="email">Email</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div>
+            <label className="field-label" htmlFor="username">
+              Username
+            </label>
+
+            <input
+              id="username"
+              className="field-input"
+              value={form.username}
+              onChange={update('username')}
+              autoComplete="username"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="registration-verification-card">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Mail size={17} className="text-brand-700" />
+              <p className="text-sm font-semibold text-ink-800">
+                Email verification
+              </p>
+            </div>
+
+            {emailVerified && (
+              <span className="registration-verified-badge">
+                <CheckCircle2 size={14} />
+                Verified
+              </span>
+            )}
+          </div>
+
+          <label className="field-label" htmlFor="email">
+            Email
+          </label>
+
+          <div className="registration-verification-row">
             <input
               id="email"
               type="email"
-              className="field-input flex-1"
+              className="field-input"
               value={form.email}
               onChange={update('email')}
               autoComplete="email"
               disabled={emailVerified}
               required
             />
+
             <button
               type="button"
-              className="btn-secondary whitespace-nowrap"
+              className="btn-secondary registration-otp-button"
               onClick={handleSendEmailOtp}
-              disabled={emailOtpLoading || emailVerified || (emailOtpSent && emailResendIn > 0)}
+              disabled={
+                emailOtpLoading ||
+                emailVerified ||
+                (emailOtpSent && emailResendIn > 0)
+              }
             >
-              {emailOtpLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+              {emailOtpLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : null}
+
               {emailOtpSent
-                ? (emailResendIn > 0 ? `Resend in ${emailResendIn}s` : 'Resend OTP')
+                ? emailResendIn > 0
+                  ? `Resend in ${emailResendIn}s`
+                  : 'Resend OTP'
                 : 'Send OTP'}
             </button>
           </div>
 
           {emailOtpSent && !emailVerified && (
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="registration-verification-row mt-3">
               <input
                 id="registration-email-otp"
                 type="text"
                 inputMode="numeric"
-                className="field-input flex-1"
+                className="field-input"
                 value={emailOtp}
-                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) =>
+                  setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                }
                 placeholder="Enter 6-digit email OTP"
                 autoComplete="one-time-code"
               />
+
               <button
                 type="button"
-                className="btn-primary whitespace-nowrap"
+                className="btn-primary registration-otp-button"
                 onClick={handleVerifyEmailOtp}
                 disabled={emailVerifyLoading || emailOtp.length !== 6}
               >
-                {emailVerifyLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                {emailVerifyLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : null}
+
                 Verify Email
               </button>
             </div>
           )}
 
-          {emailVerified && (
-            <div className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700">
-              <CheckCircle2 size={17} />
-              Email address verified
-            </div>
-          )}
-
           {emailOtpMessage && (
-            <p className="mt-2 text-xs text-ink-600">{emailOtpMessage}</p>
+            <p className="mt-2 text-xs text-ink-600">
+              {emailOtpMessage}
+            </p>
           )}
 
-          <p className="mt-2 text-xs text-ink-500">
+          <p className="mt-2 text-xs leading-5 text-ink-500">
             A 6-digit OTP is sent to this email address and expires in 5 minutes.
           </p>
         </div>
 
-        <div className="rounded-xl border border-ink-200 bg-ink-50/40 p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Smartphone size={17} className="text-brand-700" />
-            <p className="text-sm font-semibold text-ink-800">Mobile verification</p>
+        <div className="registration-verification-card">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Smartphone size={17} className="text-brand-700" />
+              <p className="text-sm font-semibold text-ink-800">
+                Mobile verification
+              </p>
+            </div>
+
+            {phoneVerified && (
+              <span className="registration-verified-badge">
+                <CheckCircle2 size={14} />
+                Verified
+              </span>
+            )}
           </div>
 
-          <label className="field-label" htmlFor="phone">Mobile number</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <label className="field-label" htmlFor="phone">
+            Mobile number
+          </label>
+
+          <div className="registration-verification-row">
             <input
               id="phone"
               type="tel"
               inputMode="tel"
-              className="field-input flex-1"
+              className="field-input"
               value={form.phone}
               onChange={update('phone')}
               placeholder="9054559272"
@@ -430,60 +506,78 @@ export default function Register() {
               disabled={phoneVerified}
               required
             />
+
             <button
               type="button"
-              className="btn-secondary whitespace-nowrap"
+              className="btn-secondary registration-otp-button"
               onClick={handleSendOtp}
-              disabled={otpLoading || phoneVerified || (otpSent && resendIn > 0)}
+              disabled={
+                otpLoading ||
+                phoneVerified ||
+                (otpSent && resendIn > 0)
+              }
             >
-              {otpLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-              {otpSent ? (resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend OTP') : 'Send OTP'}
+              {otpLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : null}
+
+              {otpSent
+                ? resendIn > 0
+                  ? `Resend in ${resendIn}s`
+                  : 'Resend OTP'
+                : 'Send OTP'}
             </button>
           </div>
 
           {otpSent && !phoneVerified && (
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="registration-verification-row mt-3">
               <input
                 id="registration-otp"
                 type="text"
                 inputMode="numeric"
-                className="field-input flex-1"
+                className="field-input"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) =>
+                  setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                }
                 placeholder="Enter 6-digit OTP"
                 autoComplete="one-time-code"
               />
+
               <button
                 type="button"
-                className="btn-primary whitespace-nowrap"
+                className="btn-primary registration-otp-button"
                 onClick={handleVerifyOtp}
                 disabled={verifyLoading || otp.length !== 6}
               >
-                {verifyLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                {verifyLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : null}
+
                 Verify OTP
               </button>
             </div>
           )}
 
-          {phoneVerified && (
-            <div className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700">
-              <CheckCircle2 size={17} />
-              Mobile number verified
-            </div>
-          )}
-
           {otpMessage && (
-            <p className="mt-2 text-xs text-ink-600">{otpMessage}</p>
+            <p className="mt-2 text-xs text-ink-600">
+              {otpMessage}
+            </p>
           )}
 
-          <p className="mt-2 text-xs text-ink-500">
-            Demo mode: use one of these test numbers: {DEMO_MOBILES.join(', ')}. The generated OTP is shown only in the backend terminal and expires in 5 minutes.
+          <p className="mt-2 text-xs leading-5 text-ink-500">
+            Demo mode: use one of these test numbers: {DEMO_MOBILES.join(', ')}.
+            The generated OTP is shown only in the backend terminal and expires in
+            5 minutes.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="registration-two-column">
           <div>
-            <label className="field-label" htmlFor="password">Password</label>
+            <label className="field-label" htmlFor="password">
+              Password
+            </label>
+
             <input
               id="password"
               type="password"
@@ -494,8 +588,12 @@ export default function Register() {
               required
             />
           </div>
+
           <div>
-            <label className="field-label" htmlFor="confirmPassword">Confirm password</label>
+            <label className="field-label" htmlFor="confirmPassword">
+              Confirm password
+            </label>
+
             <input
               id="confirmPassword"
               type="password"
@@ -509,21 +607,29 @@ export default function Register() {
         </div>
 
         <div>
-          <label className="field-label" htmlFor="aadhaar">Aadhaar card</label>
+          <label className="field-label" htmlFor="aadhaar">
+            Aadhaar card
+          </label>
+
           <label
             htmlFor="aadhaar"
             className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-4 transition hover:border-brand-300 hover:bg-brand-50/40"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
               {aadhaar ? <FileText size={18} /> : <Upload size={18} />}
             </div>
+
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-ink-800">
                 {aadhaar ? aadhaar.name : 'Upload Aadhaar image or PDF'}
               </p>
-              <p className="text-xs text-ink-500">PDF, JPG, JPEG or PNG · maximum 10 MB</p>
+
+              <p className="text-xs text-ink-500">
+                PDF, JPG, JPEG or PNG · maximum 10 MB
+              </p>
             </div>
           </label>
+
           <input
             id="aadhaar"
             type="file"
@@ -532,8 +638,10 @@ export default function Register() {
             className="sr-only"
             required
           />
-          <p className="mt-2 text-xs text-ink-500">
-            This document is used only for administrator identity verification and is stored separately from your account data.
+
+          <p className="mt-2 text-xs leading-5 text-ink-500">
+            This document is used only for administrator identity verification
+            and is stored separately from your account data.
           </p>
         </div>
 
@@ -542,7 +650,12 @@ export default function Register() {
           className="btn-primary w-full"
           disabled={loading || !emailVerified || !phoneVerified}
         >
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+          {loading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <UserPlus size={16} />
+          )}
+
           {loading ? 'Submitting…' : 'Submit registration request'}
         </button>
       </form>

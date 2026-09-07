@@ -4,8 +4,12 @@
 
 .auth-page {
   position: relative;
+
   min-height: 100vh;
-  overflow: hidden;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
   background:
     radial-gradient(
       circle at 80% 20%,
@@ -24,7 +28,33 @@
       #f4f8ff 100%
     );
 }
+/* ============================================================
+   AUTH FORM WRAPPERS
+============================================================ */
 
+.auth-form-wrapper {
+  width: 100%;
+  max-width: 450px;
+}
+
+
+/* Larger wrapper for forms such as Owner Registration */
+
+.auth-form-wrapper-wide {
+  width: 100%;
+  max-width: 640px;
+}
+
+
+/* Registration card */
+
+.auth-form-card-wide {
+  width: 100%;
+
+  padding: 1.75rem;
+
+  border-radius: 26px;
+}
 
 .auth-background {
   pointer-events: none;
@@ -1250,4 +1280,97 @@
       none;
   }
 
+}
+
+/* ============================================================
+   REGISTRATION VERIFICATION ROWS
+============================================================ */
+
+.registration-verification-row {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    128px;
+
+  align-items: stretch;
+
+  gap: 0.75rem;
+}
+
+
+.registration-verification-row .field-input {
+  width: 100%;
+  min-width: 0;
+}
+
+
+.registration-otp-button {
+  display: inline-flex;
+
+  min-width: 128px;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 0.4rem;
+
+  white-space: nowrap;
+}
+
+.registration-verification-card {
+  padding: 1.15rem;
+
+  border: 1px solid #e2e8f0;
+
+  border-radius: 16px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(248, 250, 252, 0.8),
+      rgba(255, 255, 255, 0.94)
+    );
+}
+.registration-two-column {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 1rem;
+}
+@media (max-width: 639px) {
+
+  .auth-form-wrapper-wide {
+    max-width: 100%;
+  }
+
+
+  .auth-form-card-wide {
+    padding: 1.15rem;
+
+    border-radius: 20px;
+  }
+
+
+  .registration-verification-row {
+    grid-template-columns: 1fr;
+  }
+
+
+  .registration-otp-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+
+  .registration-two-column {
+    grid-template-columns: 1fr;
+  }
+
+
+  .registration-verification-card {
+    padding: 1rem;
+  }
 }
