@@ -330,33 +330,126 @@ export const updateDocumentBeneficiaries = async (req, res) => {
 
 export const getAssignedDocuments = async (req, res) => {
     try {
+        /*
+        =========================================
+        GENERAL DOCUMENTS
+        =========================================
+
+        GENERAL records are available immediately
+        once the Owner has assigned them to this
+        Beneficiary.
+
+        No Legacy Claim is required.
+
+        Older records with no recordType are also
+        treated as GENERAL.
+        */
+
+        const generalDocuments = await Document.find({
+            assignedBeneficiaries: req.user.id,
+
+            $or: [
+                { recordType: "GENERAL" },
+                { recordType: { $exists: false } },
+                { recordType: null },
+            ],
+        })
+            .populate("ownerId", "name username")
+            .sort({ createdAt: -1 });
+
+        /*
+        =========================================
+        APPROVED LEGACY CLAIMS
+        =========================================
+
+        ASSET and LIABILITY records are released
+        only for Owners whose Legacy Claim has
+        reached APPROVED_INFORMATION_RELEASED.
+        */
+
         const approvedClaims = await LegacyClaim.find({
             beneficiaryId: req.user.id,
             status: "APPROVED_INFORMATION_RELEASED",
         }).select("ownerId");
 
-        const releasedOwnerIds = approvedClaims.map((claim) => claim.ownerId);
+        const releasedOwnerIds = approvedClaims.map(
+            (claim) => claim.ownerId
+        );
 
-        if (releasedOwnerIds.length === 0) {
-            return res.status(200).json({ documents: [] });
+        let protectedDocuments = [];
+
+        if (releasedOwnerIds.length > 0) {
+            protectedDocuments = await Document.find({
+                ownerId: {
+                    $in: releasedOwnerIds,
+                },
+
+                assignedBeneficiaries:
+                    req.user.id,
+
+                recordType: {
+                    $in: [
+                        "ASSET",
+                        "LIABILITY",
+                    ],
+                },
+            })
+                .populate(
+                    "ownerId",
+                    "name username"
+                )
+                .sort({
+                    createdAt: -1,
+                });
         }
 
-        const documents = await Document.find({
-            ownerId: { $in: releasedOwnerIds },
-            assignedBeneficiaries: req.user.id,
-        })
-            .populate("ownerId", "name username")
-            .sort({ createdAt: -1 });
+        /*
+        =========================================
+        COMBINE BOTH SETS
+        =========================================
+        */
+
+        const documents = [
+            ...generalDocuments,
+            ...protectedDocuments,
+        ];
+
+        /*
+        =========================================
+        SORT NEWEST FIRST
+        =========================================
+        */
+
+        documents.sort(
+            (a, b) =>
+                new Date(b.createdAt) -
+                new Date(a.createdAt)
+        );
+
+        /*
+        =========================================
+        RETURN BENEFICIARY DOCUMENTS
+        =========================================
+        */
 
         return res.status(200).json({
-            documents: documents.map(beneficiaryDocumentPayload),
+            documents: documents.map(
+                beneficiaryDocumentPayload
+            ),
         });
+
     } catch (error) {
-        console.error("Get assigned documents error:", error);
+        console.error(
+            "Get assigned documents error:",
+            error
+        );
 
         return res.status(500).json({
-            message: "Failed to fetch assigned documents.",
-            error: error.message,
+            message:
+                "Failed to fetch assigned documents.",
+
+            error:
+                error.message,
         });
     }
 };
@@ -375,27 +468,60 @@ export const getDocumentAccessUrl = async (req, res) => {
             req.user.role === "OWNER" &&
             document.ownerId.toString() === req.user.id;
 
-        let isReleasedBeneficiary = false;
+        let beneficiaryHasAccess = false;
 
-        if (
-            req.user.role === "BENEFICIARY" &&
-            (document.assignedBeneficiaries || []).some(
-                (beneficiaryId) => beneficiaryId.toString() === req.user.id
-            )
-        ) {
-            const approvedClaim = await LegacyClaim.exists({
-                ownerId: document.ownerId,
-                beneficiaryId: req.user.id,
-                status: "APPROVED_INFORMATION_RELEASED",
-            });
-            isReleasedBeneficiary = Boolean(approvedClaim);
+        if (req.user.role === "BENEFICIARY") {
+            const isAssigned =
+                (document.assignedBeneficiaries || []).some(
+                    (beneficiaryId) =>
+                        beneficiaryId.toString() === req.user.id
+                );
+
+            if (isAssigned) {
+                const recordType =
+                    document.recordType || "GENERAL";
+
+                if (recordType === "GENERAL") {
+                    beneficiaryHasAccess = true;
+                } else if (
+                    ["ASSET", "LIABILITY"].includes(recordType)
+                ) {
+                    const approvedClaim =
+                        await LegacyClaim.exists({
+                            ownerId: document.ownerId,
+                            beneficiaryId: req.user.id,
+                            status:
+                                "APPROVED_INFORMATION_RELEASED",
+                        });
+
+                    beneficiaryHasAccess =
+                        Boolean(approvedClaim);
+                }
+            }
         }
 
-        if (!isOwner && !isReleasedBeneficiary) {
+        if (!isOwner && !beneficiaryHasAccess) {
+            const recordType =
+                document.recordType || "GENERAL";
+
+            if (recordType === "GENERAL") {
+                return res.status(403).json({
+                    message:
+                        "You do not have access to this General document.",
+                });
+            }
+
             return res.status(403).json({
-                message: "This document remains locked until the Legacy Access Claim is approved.",
+                message:
+                    "This Asset or Liability remains locked until the Legacy Access Claim is approved.",
             });
         }
+
+        /*
+        =========================================
+        VERIFY ENCRYPTED DOCUMENT
+        =========================================
+        */
 
         if (
             document.resourceType !== "raw" ||
@@ -405,30 +531,80 @@ export const getDocumentAccessUrl = async (req, res) => {
             !document.encryption?.authTag
         ) {
             return res.status(409).json({
-                message: "This document was uploaded before vault encryption was enabled. Please re-upload it securely.",
+                message:
+                    "This document was uploaded before vault encryption was enabled. Please re-upload it securely.",
             });
         }
 
-        const encryptedBlob = await downloadEncryptedBlob(document);
-        const originalFile = decryptBuffer(encryptedBlob, document.encryption);
+        /*
+        =========================================
+        DOWNLOAD + DECRYPT
+        =========================================
+        */
 
-        res.setHeader("Content-Type", document.fileType || "application/octet-stream");
-        res.setHeader("Content-Length", originalFile.length);
-        res.setHeader("Cache-Control", "private, no-store, max-age=0");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("X-Content-Type-Options", "nosniff");
+        const encryptedBlob =
+            await downloadEncryptedBlob(document);
+
+        const originalFile =
+            decryptBuffer(
+                encryptedBlob,
+                document.encryption
+            );
+
+        /*
+        =========================================
+        STREAM ORIGINAL FILE
+        =========================================
+        */
+
         res.setHeader(
-            "Content-Disposition",
-            `inline; filename*=UTF-8''${encodeURIComponent(document.originalName)}`
+            "Content-Type",
+            document.fileType ||
+                "application/octet-stream"
         );
 
-        return res.status(200).send(originalFile);
+        res.setHeader(
+            "Content-Length",
+            originalFile.length
+        );
+
+        res.setHeader(
+            "Cache-Control",
+            "private, no-store, max-age=0"
+        );
+
+        res.setHeader(
+            "Pragma",
+            "no-cache"
+        );
+
+        res.setHeader(
+            "X-Content-Type-Options",
+            "nosniff"
+        );
+
+        res.setHeader(
+            "Content-Disposition",
+            `inline; filename*=UTF-8''${encodeURIComponent(
+                document.originalName
+            )}`
+        );
+
+        return res
+            .status(200)
+            .send(originalFile);
+
     } catch (error) {
-        console.error("Document access error:", error);
+        console.error(
+            "Document access error:",
+            error
+        );
 
         return res.status(500).json({
-            message: "Failed to access document.",
-            error: error.message,
+            message:
+                "Failed to access document.",
+            error:
+                error.message,
         });
     }
 };
