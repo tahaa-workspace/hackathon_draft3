@@ -4,13 +4,13 @@ import streamifier from 'streamifier';
 import User from '../models/User.js';
 import RegistrationPhoneVerification from '../models/RegistrationPhoneVerification.js';
 import cloudinary from '../config/cloudinary.js';
-import {
-  sendRegistrationOTP as sendSmsOTP,
-  verifyRegistrationOTP as verifySmsOTP,
-} from '../services/smsService.js';
 
 const SALT_ROUNDS = 12;
+const DEMO_MOBILE = '+919054559272';
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const PHONE_PROOF_EXPIRY_MS = 10 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const MAX_OTP_ATTEMPTS = 5;
 
 function normalizePhone(value) {
   const raw = String(value || '').trim().replace(/[\s()-]/g, '');
@@ -67,31 +67,83 @@ export async function requestRegistrationOTP(req, res) {
 
     if (!phone) {
       return res.status(400).json({
-        message: 'Enter a valid mobile number. Indian 10-digit numbers are accepted.',
+        message: 'Enter a valid 10-digit Indian mobile number.',
+      });
+    }
+
+    if (phone !== DEMO_MOBILE) {
+      return res.status(400).json({
+        message: 'Demo mode: please use mobile number 9054559272.',
       });
     }
 
     const existing = await User.findOne({ phone }).lean();
     if (existing) {
       return res.status(409).json({
-        message: 'An account with this mobile number already exists.',
+        message: 'An account with this mobile number already exists. Delete the previous demo owner before testing registration again.',
       });
     }
 
-    await sendSmsOTP(phone);
+    let session = await RegistrationPhoneVerification.findOne({ phone }).select('+otpHash +tokenHash');
+    const now = Date.now();
+
+    if (
+      session?.lastSentAt &&
+      now - new Date(session.lastSentAt).getTime() < OTP_RESEND_COOLDOWN_MS
+    ) {
+      const retryAfterSeconds = Math.ceil(
+        (OTP_RESEND_COOLDOWN_MS - (now - new Date(session.lastSentAt).getTime())) / 1000
+      );
+
+      return res.status(429).json({
+        message: `Please wait ${retryAfterSeconds} seconds before requesting another OTP.`,
+        retryAfterSeconds,
+      });
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = await bcrypt.hash(otp, SALT_ROUNDS);
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+
+    if (!session) {
+      session = await RegistrationPhoneVerification.create({
+        phone,
+        otpHash,
+        attempts: 0,
+        resendCount: 0,
+        lastSentAt: new Date(),
+        tokenHash: null,
+        verifiedAt: null,
+        expiresAt,
+      });
+    } else {
+      session.otpHash = otpHash;
+      session.attempts = 0;
+      session.resendCount = (session.resendCount || 0) + 1;
+      session.lastSentAt = new Date();
+      session.tokenHash = null;
+      session.verifiedAt = null;
+      session.expiresAt = expiresAt;
+      await session.save();
+    }
+
+    console.log('\n===============================================');
+    console.log('NEXT GEN VAULT - DEMO REGISTRATION OTP');
+    console.log(`Mobile: 9054559272`);
+    console.log(`OTP: ${otp}`);
+    console.log('Valid for: 5 minutes');
+    console.log('===============================================\n');
 
     return res.status(200).json({
-      message: 'OTP sent successfully to your mobile number.',
+      message: 'Demo OTP generated. Check the backend terminal for the 6-digit OTP.',
       phone,
+      expiresInSeconds: OTP_EXPIRY_MS / 1000,
     });
   } catch (error) {
-    console.error('Registration OTP send error:', error);
+    console.error('Registration OTP generation error:', error);
 
-    return res.status(error.status === 429 ? 429 : 500).json({
-      message:
-        error.status === 429
-          ? 'Too many OTP requests. Please try again later.'
-          : 'Unable to send OTP. Please check the mobile number and SMS configuration.',
+    return res.status(500).json({
+      message: 'Unable to generate the demo OTP. Please try again.',
     });
   }
 }
@@ -105,25 +157,59 @@ export async function verifyRegistrationOTP(req, res) {
       return res.status(400).json({ message: 'Enter a valid mobile number.' });
     }
 
-    if (!/^\d{4,10}$/.test(otp)) {
-      return res.status(400).json({ message: 'Enter the OTP sent to your mobile number.' });
+    if (phone !== DEMO_MOBILE) {
+      return res.status(400).json({
+        message: 'Demo mode: please use mobile number 9054559272.',
+      });
     }
 
-    const approved = await verifySmsOTP(phone, otp);
+    if (!/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ message: 'Enter the 6-digit OTP shown in the backend terminal.' });
+    }
+
+    const session = await RegistrationPhoneVerification.findOne({ phone }).select('+otpHash +tokenHash');
+
+    if (!session || !session.otpHash) {
+      return res.status(404).json({
+        message: 'No active registration OTP was found. Please send a new OTP.',
+      });
+    }
+
+    if (new Date() > session.expiresAt) {
+      await RegistrationPhoneVerification.deleteOne({ _id: session._id });
+      return res.status(400).json({
+        message: 'OTP has expired. Please send a new OTP.',
+      });
+    }
+
+    if (session.attempts >= MAX_OTP_ATTEMPTS) {
+      await RegistrationPhoneVerification.deleteOne({ _id: session._id });
+      return res.status(429).json({
+        message: 'Maximum OTP attempts exceeded. Please start verification again.',
+      });
+    }
+
+    const approved = await bcrypt.compare(otp, session.otpHash);
 
     if (!approved) {
-      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+      session.attempts += 1;
+      await session.save();
+
+      const attemptsRemaining = MAX_OTP_ATTEMPTS - session.attempts;
+      return res.status(400).json({
+        message: `Invalid OTP. ${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining.`,
+      });
     }
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = hashToken(verificationToken);
-    const expiresAt = new Date(Date.now() + PHONE_PROOF_EXPIRY_MS);
 
-    await RegistrationPhoneVerification.findOneAndUpdate(
-      { phone },
-      { phone, tokenHash, expiresAt },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    session.otpHash = null;
+    session.attempts = 0;
+    session.tokenHash = tokenHash;
+    session.verifiedAt = new Date();
+    session.expiresAt = new Date(Date.now() + PHONE_PROOF_EXPIRY_MS);
+    await session.save();
 
     return res.status(200).json({
       message: 'Mobile number verified successfully.',
@@ -135,8 +221,8 @@ export async function verifyRegistrationOTP(req, res) {
   } catch (error) {
     console.error('Registration OTP verification error:', error);
 
-    return res.status(400).json({
-      message: 'Invalid or expired OTP. Please request a new OTP and try again.',
+    return res.status(500).json({
+      message: 'Failed to verify the demo OTP. Please try again.',
     });
   }
 }
@@ -168,6 +254,12 @@ export async function registerOwner(req, res) {
     });
   }
 
+  if (phone !== DEMO_MOBILE) {
+    return res.status(400).json({
+      message: 'Demo mode: please use mobile number 9054559272.',
+    });
+  }
+
   if (!req.file) {
     return res.status(400).json({
       message: 'Aadhaar card image or PDF is required for owner registration.',
@@ -190,6 +282,7 @@ export async function registerOwner(req, res) {
   const proof = await RegistrationPhoneVerification.findOne({
     phone,
     tokenHash,
+    verifiedAt: { $ne: null },
     expiresAt: { $gt: new Date() },
   }).select('+tokenHash');
 
