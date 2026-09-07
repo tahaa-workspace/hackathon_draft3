@@ -1,13 +1,18 @@
 import { Router } from "express";
 
 import {
-    register,
     registerLawyer,
     login,
     requestPasswordChangeOTP,
     verifyPasswordChangeOTP,
     completePasswordChange,
 } from "../controllers/authController.js";
+
+import {
+    registerOwner,
+    requestRegistrationOTP,
+    verifyRegistrationOTP,
+} from "../controllers/registrationController.js";
 
 import {
     requestForgotPasswordOTP,
@@ -27,9 +32,19 @@ REGISTRATION
 */
 
 router.post(
+    "/registration/send-otp",
+    requestRegistrationOTP
+);
+
+router.post(
+    "/registration/verify-otp",
+    verifyRegistrationOTP
+);
+
+router.post(
     "/register",
     upload.single("aadhaar"),
-    register
+    registerOwner
 );
 
 router.post(
