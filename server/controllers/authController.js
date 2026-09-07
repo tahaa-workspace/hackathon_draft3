@@ -351,9 +351,9 @@ export async function login(req, res) {
 
 
 /*
-=========================================================
+======================
 PASSWORD CHANGE CONFIG
-=========================================================
+======================
 */
 
 const PASSWORD_OTP_EXPIRY_MS =
@@ -1120,6 +1120,7 @@ export const completePasswordChange =
         const samePassword =
             await bcrypt.compare(
                 newPassword,
+
                 user.passwordHash
             );
 

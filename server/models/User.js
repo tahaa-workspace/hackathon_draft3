@@ -27,6 +27,7 @@ const userSchema = new Schema(
     },
     lawyerProfile: {
       phone: { type: String, default: null, trim: true },
+      isAvailable:{type:Boolean,default:true},
       city: { type: String, default: null, trim: true },
       state: { type: String, default: null, trim: true },
       enrollmentNumber: { type: String, default: null, trim: true },

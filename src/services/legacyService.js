@@ -67,10 +67,7 @@ export async function getAdminLegacyClaims() {
   return data.claims || [];
 }
 
-export async function getApprovedLawyers() {
-  const data = await request('/legacy-claims/admin/lawyers');
-  return data.lawyers || [];
-}
+
 
 export async function reviewClaimAsAdmin(id, action, remarks = '') {
   return request(`/legacy-claims/admin/${id}/review`, {
@@ -79,11 +76,53 @@ export async function reviewClaimAsAdmin(id, action, remarks = '') {
   });
 }
 
-export async function assignClaimToLawyer(id, lawyerId) {
-  return request(`/legacy-claims/admin/${id}/assign-lawyer`, {
-    method: 'PUT',
-    body: { lawyerId },
-  });
+export async function getLawyersForSelection() {
+  const data =
+    await request(
+      '/legacy-claims/lawyers'
+    );
+
+  return data.lawyers || [];
+}
+
+
+export async function selectClaimLawyer(
+  claimId,
+  lawyerId
+) {
+  return request(
+    `/legacy-claims/${claimId}/select-lawyer`,
+    {
+      method: 'PUT',
+
+      body: {
+        lawyerId,
+      },
+    }
+  );
+}
+
+
+export async function getLawyerAvailability() {
+  return request(
+    '/legacy-claims/lawyer/availability'
+  );
+}
+
+
+export async function updateLawyerAvailability(
+  isAvailable
+) {
+  return request(
+    '/legacy-claims/lawyer/availability',
+    {
+      method: 'PUT',
+
+      body: {
+        isAvailable,
+      },
+    }
+  );
 }
 
 export async function getLawyerClaims() {

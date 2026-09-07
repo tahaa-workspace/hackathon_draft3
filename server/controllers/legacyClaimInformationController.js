@@ -175,30 +175,58 @@ export async function requestMoreInformation(req, res) {
       return res.status(409).json({ message: 'The Beneficiary already has a pending information request for this claim.' });
     }
 
-    let returnStatus;
-    if (req.user.role === 'ADMIN') {
-      if (claim.status !== 'UNDER_ADMIN_REVIEW') {
-        return res.status(400).json({ message: 'Admin can request more information only while the claim is under Admin review.' });
-      }
-      returnStatus = 'UNDER_ADMIN_REVIEW';
-      claim.adminReview.reviewedBy = req.user.id;
-      claim.adminReview.reviewedAt = new Date();
-      claim.adminReview.remarks = message;
-    } else if (req.user.role === 'LAWYER') {
-      if (!isAssignedLawyer(claim, req.user.id)) {
-        return res.status(403).json({ message: 'This claim is not assigned to you.' });
-      }
-      if (claim.status !== 'UNDER_LAWYER_REVIEW') {
-        return res.status(400).json({ message: 'Lawyer can request more information only while the claim is under Lawyer review.' });
-      }
-      returnStatus = 'UNDER_LAWYER_REVIEW';
-      claim.lawyerReview.reviewedBy = req.user.id;
-      claim.lawyerReview.reviewedAt = new Date();
-      claim.lawyerReview.remarks = message;
-      claim.lawyerReview.action = 'REQUEST_MORE_INFORMATION';
-    } else {
-      return res.status(403).json({ message: 'Only Admin or the assigned Lawyer can request additional information.' });
-    }
+    
+if (
+  req.user.role !== 'LAWYER'
+) {
+  return res
+    .status(403)
+    .json({
+      message:
+        'Only the assigned Lawyer can request additional information.',
+    });
+}
+
+if (
+  !isAssignedLawyer(
+    claim,
+    req.user.id
+  )
+) {
+  return res
+    .status(403)
+    .json({
+      message:
+        'This Legacy Claim is not assigned to you.',
+    });
+}
+
+if (
+  claim.status !==
+  'UNDER_LAWYER_REVIEW'
+) {
+  return res
+    .status(400)
+    .json({
+      message:
+        'Additional information can be requested only while the claim is under Lawyer review.',
+    });
+}
+
+const returnStatus =
+  'UNDER_LAWYER_REVIEW';
+
+claim.lawyerReview.reviewedBy =
+  req.user.id;
+
+claim.lawyerReview.reviewedAt =
+  new Date();
+
+claim.lawyerReview.remarks =
+  message;
+
+claim.lawyerReview.action =
+  'REQUEST_MORE_INFORMATION';
 
     claim.informationRequests.push({
       requestedByRole: req.user.role,

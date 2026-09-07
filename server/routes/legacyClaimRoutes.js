@@ -8,7 +8,9 @@ import {
   listAdminLegacyClaims,
   listApprovedLawyers,
   adminReviewClaim,
-  assignClaimLawyer,
+  selectClaimLawyer,
+getLawyerAvailability,
+updateLawyerAvailability,
   listLawyerClaims,
   lawyerReviewClaim,
   getClaimFileUrl,
@@ -55,14 +57,18 @@ router.post(
 
 router.get('/mine', protect, authorize('BENEFICIARY'), listMyLegacyClaims);
 router.get('/admin', protect, authorize('ADMIN'), listAdminLegacyClaims);
-router.get('/admin/lawyers', protect, authorize('ADMIN'), listApprovedLawyers);
+
 router.put('/admin/:id/review', protect, authorize('ADMIN'), blockDeprecatedReviewActions, adminReviewClaim);
-router.put('/admin/:id/assign-lawyer', protect, authorize('ADMIN'), assignClaimLawyer);
 router.get('/lawyer', protect, authorize('LAWYER'), listLawyerClaims);
 router.put('/lawyer/:id/review', protect, authorize('LAWYER'), blockDeprecatedReviewActions, lawyerReviewClaim);
 
 router.get('/:id/information-requests', protect, authorize('ADMIN', 'BENEFICIARY', 'LAWYER'), getClaimInformationRequests);
-router.put('/:id/request-more-information', protect, authorize('ADMIN', 'LAWYER'), requestMoreInformation);
+router.put(
+  '/:id/request-more-information',
+  protect,
+  authorize('LAWYER'),
+  requestMoreInformation
+);
 router.put('/:id/reject', protect, authorize('ADMIN', 'LAWYER'), rejectLegacyClaim);
 router.post(
   '/:id/additional-information',
@@ -79,5 +85,45 @@ router.get(
 );
 
 router.get('/:id/files/:kind', protect, authorize('ADMIN', 'BENEFICIARY', 'LAWYER'), getClaimFileUrl);
+/*
+|--------------------------------------------------------------------------
+| BENEFICIARY LAWYER SELECTION
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  '/lawyers',
+  protect,
+  authorize('BENEFICIARY'),
+  listApprovedLawyers
+);
+
+router.put(
+  '/:id/select-lawyer',
+  protect,
+  authorize('BENEFICIARY'),
+  selectClaimLawyer
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| LAWYER AVAILABILITY
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  '/lawyer/availability',
+  protect,
+  authorize('LAWYER'),
+  getLawyerAvailability
+);
+
+router.put(
+  '/lawyer/availability',
+  protect,
+  authorize('LAWYER'),
+  updateLawyerAvailability
+);
 
 export default router;

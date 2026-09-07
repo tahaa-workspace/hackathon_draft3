@@ -471,6 +471,12 @@ function personPayload(user) {
       user.lawyerProfile
         ?.stateBarCouncil ||
       null,
+
+
+      isAvailable:
+  user.role === 'LAWYER'
+    ? user.lawyerProfile?.isAvailable !== false
+    : null,
   };
 }
 
@@ -1330,31 +1336,42 @@ export async function listApprovedLawyers(
   req,
   res
 ) {
-  const lawyers =
-    await User.find({
-      role:
-        'LAWYER',
-
-      status:
-        'ACTIVE',
-    })
-
-      .sort({
-        name: 1,
+  try {
+    const lawyers =
+      await User.find({
+        role: 'LAWYER',
+        status: 'ACTIVE',
       })
+        .sort({
+          'lawyerProfile.isAvailable': -1,
+          name: 1,
+        })
+        .select(
+          'name username email role lawyerProfile'
+        );
 
-      .select(
-        'name username email role lawyerProfile'
-      );
+    return res
+      .status(200)
+      .json({
+        lawyers:
+          lawyers.map(
+            personPayload
+          ),
+      });
 
-  return res
-    .status(200)
-    .json({
-      lawyers:
-        lawyers.map(
-          personPayload
-        ),
-    });
+  } catch (error) {
+    console.error(
+      'List Lawyers error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        message:
+          'Unable to load Lawyers.',
+      });
+  }
 }
 
 /*
@@ -1501,8 +1518,9 @@ export async function adminReviewClaim(
 
   await LegacyClaim.deleteOne({
     _id:
-      claim._id,
+        clearImmediate._id,
   });
+
 
   return res
     .status(200)
@@ -1556,7 +1574,9 @@ export async function adminReviewClaim(
     .status(200)
     .json({
       message:
-        'Admin review updated.',
+  action === 'FORWARD'
+    ? 'Legacy Claim approved by Admin. The Beneficiary can now select an available Lawyer.'
+    : 'Admin review updated.',
 
       claim:
         await enrichClaimWithAssignedRecords(
@@ -1571,88 +1591,167 @@ export async function adminReviewClaim(
 |--------------------------------------------------------------------------
 */
 
-export async function assignClaimLawyer(
+export async function selectClaimLawyer(
   req,
   res
 ) {
-  const {
-    lawyerId,
-  } =
-    req.body || {};
+  try {
+    const {
+      lawyerId,
+    } = req.body || {};
 
-  const claim =
-    await LegacyClaim.findById(
-      req.params.id
+    if (!lawyerId) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'Please select a Lawyer.',
+        });
+    }
+
+    const claim =
+      await LegacyClaim.findOne({
+        _id: req.params.id,
+
+        beneficiaryId:
+          req.user.id,
+      });
+
+    if (!claim) {
+      return res
+        .status(404)
+        .json({
+          message:
+            'Legacy Access Claim not found.',
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN MUST FIRST APPROVE THE CLAIM
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      claim.status !==
+      'LEGACY_ACCESS_REQUESTED'
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'A Lawyer can be selected only after Admin approval.',
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PREVENT REASSIGNMENT
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      claim.assignedLawyerId
+    ) {
+      return res
+        .status(409)
+        .json({
+          message:
+            'A Lawyer has already been selected for this Legacy Claim.',
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FIND ACTIVE LAWYER
+    |--------------------------------------------------------------------------
+    */
+
+    const lawyer =
+      await User.findOne({
+        _id:
+          lawyerId,
+
+        role:
+          'LAWYER',
+
+        status:
+          'ACTIVE',
+      });
+
+    if (!lawyer) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'The selected Lawyer could not be found.',
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LAWYER MUST BE AVAILABLE
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      lawyer.lawyerProfile
+        ?.isAvailable === false
+    ) {
+      return res
+        .status(409)
+        .json({
+          message:
+            'This Lawyer is currently unavailable. Please select another available Lawyer.',
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ASSIGN LAWYER
+    |--------------------------------------------------------------------------
+    */
+
+    claim.assignedLawyerId =
+      lawyer._id;
+
+    claim.status =
+      'UNDER_LAWYER_REVIEW';
+
+    await claim.save();
+
+    const populated =
+      await populatedClaim(
+        LegacyClaim.findById(
+          claim._id
+        )
+      );
+
+    return res
+      .status(200)
+      .json({
+        message:
+          `${lawyer.name} has been selected. Your Legacy Claim is now under Lawyer review.`,
+
+        claim:
+          await enrichClaimWithAssignedRecords(
+            populated
+          ),
+      });
+
+  } catch (error) {
+    console.error(
+      'Select Legacy Claim Lawyer error:',
+      error
     );
 
-  if (!claim) {
     return res
-      .status(404)
+      .status(500)
       .json({
         message:
-          'Legacy Access Claim not found.',
+          'Unable to select Lawyer.',
       });
   }
-
-  if (
-    claim.status !==
-    'LEGACY_ACCESS_REQUESTED'
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'Admin must complete platform checks before assigning a Lawyer.',
-      });
-  }
-
-  const lawyer =
-    await User.findOne({
-      _id:
-        lawyerId,
-
-      role:
-        'LAWYER',
-
-      status:
-        'ACTIVE',
-    });
-
-  if (!lawyer) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'Select an approved active Lawyer.',
-      });
-  }
-
-  claim.assignedLawyerId =
-    lawyer._id;
-
-  claim.status =
-    'UNDER_LAWYER_REVIEW';
-
-  await claim.save();
-
-  const populated =
-    await populatedClaim(
-      LegacyClaim.findById(
-        claim._id
-      )
-    );
-
-  return res
-    .status(200)
-    .json({
-      message:
-        'Claim assigned to Lawyer.',
-
-      claim:
-        await enrichClaimWithAssignedRecords(
-          populated
-        ),
-    });
 }
 
 /*
@@ -1996,6 +2095,144 @@ export async function getClaimFileUrl(
 
         error:
           error.message,
+      });
+  }
+}
+
+
+export async function getLawyerAvailability(
+  req,
+  res
+) {
+  try {
+    const lawyer =
+      await User.findOne({
+        _id:
+          req.user.id,
+
+        role:
+          'LAWYER',
+
+        status:
+          'ACTIVE',
+      }).select(
+        'lawyerProfile.isAvailable'
+      );
+
+    if (!lawyer) {
+      return res
+        .status(404)
+        .json({
+          message:
+            'Lawyer account not found.',
+        });
+    }
+
+    return res
+      .status(200)
+      .json({
+        isAvailable:
+          lawyer.lawyerProfile
+            ?.isAvailable !== false,
+      });
+
+  } catch (error) {
+    console.error(
+      'Get Lawyer availability error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        message:
+          'Unable to load availability.',
+      });
+  }
+}
+
+
+export async function updateLawyerAvailability(
+  req,
+  res
+) {
+  try {
+    const {
+      isAvailable,
+    } = req.body || {};
+
+    if (
+      typeof isAvailable !==
+      'boolean'
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'isAvailable must be true or false.',
+        });
+    }
+
+    const lawyer =
+      await User.findOneAndUpdate(
+        {
+          _id:
+            req.user.id,
+
+          role:
+            'LAWYER',
+
+          status:
+            'ACTIVE',
+        },
+
+        {
+          $set: {
+            'lawyerProfile.isAvailable':
+              isAvailable,
+          },
+        },
+
+        {
+          new: true,
+        }
+      ).select(
+        'lawyerProfile.isAvailable'
+      );
+
+    if (!lawyer) {
+      return res
+        .status(404)
+        .json({
+          message:
+            'Active Lawyer account not found.',
+        });
+    }
+
+    return res
+      .status(200)
+      .json({
+        message:
+          isAvailable
+            ? 'You are now available for new Legacy Claims.'
+            : 'You are now unavailable for new Legacy Claims.',
+
+        isAvailable:
+          lawyer.lawyerProfile
+            ?.isAvailable !== false,
+      });
+
+  } catch (error) {
+    console.error(
+      'Update Lawyer availability error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        message:
+          'Unable to update availability.',
       });
   }
 }
