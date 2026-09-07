@@ -10,6 +10,7 @@ const userSchema = new Schema(
     name: { type: String, required: true, trim: true },
     username: { type: String, required: true, unique: true, trim: true, lowercase: true },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    emailVerified: { type: Boolean, default: false },
     phone: { type: String, unique: true, sparse: true, trim: true },
     phoneVerified: { type: Boolean, default: false },
     passwordHash: { type: String, required: true, select: false },
