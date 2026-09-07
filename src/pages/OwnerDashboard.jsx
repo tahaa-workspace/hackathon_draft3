@@ -25,51 +25,68 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronUp,
+  Trash2,
 } from "lucide-react";
 
 import Navbar from "../components/Navbar";
 
-import { useAuth } from "../context/AuthContext";
+import {
+  useAuth,
+} from "../context/AuthContext";
 
 import {
   createBeneficiary,
   listBeneficiaries,
 } from "../services/authService";
 
+
 const EMPTY = {
   name: "",
   username: "",
   email: "",
   initialPassword: "",
-  aadhaar:null,
+  aadhaar: null,
 };
+
 
 function formatDate(value) {
   return new Date(
     value
-  ).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  ).toLocaleString(
+    undefined,
+    {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }
+  );
 }
 
-function getCategoryStyle(category) {
+
+function getCategoryStyle(
+  category
+) {
   const styles = {
     Personal:
       "bg-blue-50 text-blue-700",
+
     Financial:
       "bg-emerald-50 text-emerald-700",
+
     Legal:
       "bg-violet-50 text-violet-700",
+
     Insurance:
       "bg-amber-50 text-amber-700",
+
     Property:
       "bg-cyan-50 text-cyan-700",
+
     Family:
       "bg-pink-50 text-pink-700",
+
     Other:
       "bg-ink-100 text-ink-600",
   };
@@ -80,21 +97,49 @@ function getCategoryStyle(category) {
   );
 }
 
+
 export default function OwnerDashboard() {
-  const { user, token } =
-    useAuth();
 
-  const [form, setForm] =
-    useState(EMPTY);
+  const {
+    user,
+    token,
+  } = useAuth();
 
-  const [error, setError] =
-    useState("");
 
-  const [success, setSuccess] =
-    useState("");
+  /*
+  |--------------------------------------------------------------------------
+  | BENEFICIARY FORM STATE
+  |--------------------------------------------------------------------------
+  */
 
-  const [loading, setLoading] =
-    useState(false);
+  const [
+    form,
+    setForm,
+  ] = useState(
+    EMPTY
+  );
+
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  const [
+    success,
+    setSuccess,
+  ] = useState("");
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | BENEFICIARY LIST STATE
+  |--------------------------------------------------------------------------
+  */
 
   const [
     beneficiaries,
@@ -105,6 +150,13 @@ export default function OwnerDashboard() {
     listLoading,
     setListLoading,
   ] = useState(true);
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | DOCUMENT STATE
+  |--------------------------------------------------------------------------
+  */
 
   const [
     documents,
@@ -120,6 +172,25 @@ export default function OwnerDashboard() {
     documentError,
     setDocumentError,
   ] = useState("");
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | DOCUMENT DELETE STATE
+  |--------------------------------------------------------------------------
+  */
+
+  const [
+    deletingDocumentId,
+    setDeletingDocumentId,
+  ] = useState(null);
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | DOCUMENT ACCESS MANAGEMENT
+  |--------------------------------------------------------------------------
+  */
 
   const [
     managingDocumentId,
@@ -141,123 +212,216 @@ export default function OwnerDashboard() {
     setAccessMessage,
   ] = useState("");
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | BENEFICIARY FORM TOGGLE
+  |--------------------------------------------------------------------------
+  */
+
   const [
     beneficiaryFormOpen,
     setBeneficiaryFormOpen,
   ] = useState(false);
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | FORM UPDATE HELPER
+  |--------------------------------------------------------------------------
+  */
+
   const update =
-    (key) => (e) =>
-      setForm((current) => ({
-        ...current,
-        [key]:
-          e.target.value,
-      }));
+    (key) =>
+    (e) =>
+      setForm(
+        (current) => ({
+          ...current,
 
-  const loadBeneficiaries =
-    useCallback(async () => {
-      setListLoading(true);
-
-      try {
-        const data =
-          await listBeneficiaries();
-
-        setBeneficiaries(
-          data.beneficiaries || []
-        );
-      } catch (loadError) {
-        console.error(
-          "Beneficiary loading error:",
-          loadError
-        );
-      } finally {
-        setListLoading(false);
-      }
-    }, []);
-
-  const loadDocuments =
-    useCallback(async () => {
-      if (!token) {
-        setDocumentsLoading(
-          false
-        );
-
-        return;
-      }
-
-      setDocumentsLoading(
-        true
+          [key]:
+            e.target.value,
+        })
       );
 
-      try {
-        setDocumentError("");
 
-        const response =
-          await fetch(
-            "/api/documents",
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
+  /*
+  |--------------------------------------------------------------------------
+  | LOAD BENEFICIARIES
+  |--------------------------------------------------------------------------
+  */
+
+  const loadBeneficiaries =
+    useCallback(
+      async () => {
+
+        setListLoading(
+          true
+        );
+
+        try {
+
+          const data =
+            await listBeneficiaries();
+
+          setBeneficiaries(
+            data.beneficiaries ||
+            []
           );
 
-        const data =
-          await response.json();
+        } catch (
+          loadError
+        ) {
 
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "Failed to fetch documents."
+          console.error(
+            "Beneficiary loading error:",
+            loadError
           );
+
+        } finally {
+
+          setListLoading(
+            false
+          );
+
+        }
+      },
+      []
+    );
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | LOAD OWNER DOCUMENTS
+  |--------------------------------------------------------------------------
+  */
+
+  const loadDocuments =
+    useCallback(
+      async () => {
+
+        if (!token) {
+
+          setDocumentsLoading(
+            false
+          );
+
+          return;
         }
 
-        setDocuments(
-          data.documents || []
-        );
-      } catch (loadError) {
-        console.error(
-          "Document loading error:",
-          loadError
+        setDocumentsLoading(
+          true
         );
 
-        setDocumentError(
-          loadError.message ||
+        try {
+
+          setDocumentError(
+            ""
+          );
+
+          const response =
+            await fetch(
+              "/api/documents",
+              {
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                },
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (!response.ok) {
+
+            throw new Error(
+              data.message ||
+              "Failed to fetch documents."
+            );
+
+          }
+
+          setDocuments(
+            data.documents ||
+            []
+          );
+
+        } catch (
+          loadError
+        ) {
+
+          console.error(
+            "Document loading error:",
+            loadError
+          );
+
+          setDocumentError(
+            loadError.message ||
             "Failed to fetch documents."
-        );
-      } finally {
-        setDocumentsLoading(
-          false
-        );
-      }
-    }, [token]);
+          );
+
+        } finally {
+
+          setDocumentsLoading(
+            false
+          );
+
+        }
+      },
+      [token]
+    );
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | INITIAL LOAD
+  |--------------------------------------------------------------------------
+  */
 
   useEffect(() => {
+
     loadBeneficiaries();
     loadDocuments();
+
   }, [
     loadBeneficiaries,
     loadDocuments,
   ]);
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | CREATE BENEFICIARY
+  |--------------------------------------------------------------------------
+  */
+
   const handleSubmit =
     async (e) => {
+
       e.preventDefault();
 
       setError("");
       setSuccess("");
-      if (!form.aadhaar) {
-  setError(
-    "Please upload the Beneficiary's Aadhaar card."
-  );
 
-  return;
-}
 
       if (
-        form.initialPassword
+        !form.aadhaar
+      ) {
+
+        setError(
+          "Please upload the Beneficiary's Aadhaar card."
+        );
+
+        return;
+      }
+
+
+      if (
+        form
+          .initialPassword
           .length < 8
       ) {
+
         setError(
           "Initial password must be at least 8 characters long."
         );
@@ -265,9 +429,14 @@ export default function OwnerDashboard() {
         return;
       }
 
-      setLoading(true);
+
+      setLoading(
+        true
+      );
+
 
       try {
+
         await createBeneficiary(
           form
         );
@@ -276,52 +445,84 @@ export default function OwnerDashboard() {
           "Beneficiary created successfully. They must change their password on first login."
         );
 
-        setForm(EMPTY);
+        setForm(
+          EMPTY
+        );
 
         await loadBeneficiaries();
-      } catch (submitError) {
+
+      } catch (
+        submitError
+      ) {
+
         setError(
           submitError.message
         );
+
       } finally {
-        setLoading(false);
+
+        setLoading(
+          false
+        );
+
       }
     };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | VIEW DOCUMENT
+  |--------------------------------------------------------------------------
+  */
+
   const viewDocument =
-    async (documentId) => {
+    async (
+      documentId
+    ) => {
+
       try {
-        setDocumentError("");
+
+        setDocumentError(
+          ""
+        );
 
         const response =
           await fetch(
             `/api/documents/${documentId}/access`,
             {
               headers: {
-                Authorization: `Bearer ${token}`,
+                Authorization:
+                  `Bearer ${token}`,
               },
             }
           );
 
-        if (!response.ok) {
+        if (
+          !response.ok
+        ) {
+
           let message =
             "Unable to access document.";
 
           try {
+
             const data =
               await response.json();
 
             message =
               data.message ||
               message;
+
           } catch {
-            // Binary response may not be JSON.
+            // Response may be binary.
           }
 
           throw new Error(
             message
           );
+
         }
+
 
         const blob =
           await response.blob();
@@ -343,7 +544,11 @@ export default function OwnerDashboard() {
             ),
           60000
         );
-      } catch (viewError) {
+
+      } catch (
+        viewError
+      ) {
+
         console.error(
           "Document access error:",
           viewError
@@ -351,28 +556,189 @@ export default function OwnerDashboard() {
 
         setDocumentError(
           viewError.message ||
-            "Unable to access document."
+          "Unable to access document."
         );
+
       }
     };
 
-  const openAccessManager = (
-    document
-  ) => {
-    setManagingDocumentId(
-      document.id
-    );
 
-    setSelectedBeneficiaryIds(
-      document.assignedBeneficiaryIds ||
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE DOCUMENT
+  |--------------------------------------------------------------------------
+  */
+
+  const deleteDocument =
+    async (
+      document
+    ) => {
+
+      const confirmed =
+        window.confirm(
+          `Permanently delete "${document.title}"?\n\nThis will permanently delete the encrypted document from Cloudinary and remove its metadata from MongoDB Atlas.\n\nThis action cannot be undone.`
+        );
+
+
+      if (
+        !confirmed
+      ) {
+        return;
+      }
+
+
+      setDeletingDocumentId(
+        document.id
+      );
+
+      setDocumentError(
+        ""
+      );
+
+      setAccessMessage(
+        ""
+      );
+
+
+      try {
+
+        const response =
+          await fetch(
+            `/api/documents/${document.id}`,
+            {
+              method:
+                "DELETE",
+
+              headers: {
+                Authorization:
+                  `Bearer ${token}`,
+              },
+            }
+          );
+
+
+        const data =
+          await response
+            .json()
+            .catch(
+              () => ({})
+            );
+
+
+        if (
+          !response.ok
+        ) {
+
+          throw new Error(
+            data.message ||
+            "Failed to delete document."
+          );
+
+        }
+
+
+        /*
+        =========================================
+        REMOVE DOCUMENT FROM LOCAL UI
+        =========================================
+        */
+
+        setDocuments(
+          (current) =>
+            current.filter(
+              (item) =>
+                item.id !==
+                document.id
+            )
+        );
+
+
+        /*
+        =========================================
+        CLOSE ACCESS MANAGER IF THIS DOCUMENT
+        WAS OPEN
+        =========================================
+        */
+
+        if (
+          managingDocumentId ===
+          document.id
+        ) {
+
+          setManagingDocumentId(
+            null
+          );
+
+          setSelectedBeneficiaryIds(
+            []
+          );
+
+          setAccessMessage(
+            ""
+          );
+
+        }
+
+      } catch (
+        deleteError
+      ) {
+
+        console.error(
+          "Document deletion error:",
+          deleteError
+        );
+
+        setDocumentError(
+          deleteError.message ||
+          "Failed to delete document."
+        );
+
+      } finally {
+
+        setDeletingDocumentId(
+          null
+        );
+
+      }
+    };
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | OPEN DOCUMENT ACCESS MANAGER
+  |--------------------------------------------------------------------------
+  */
+
+  const openAccessManager =
+    (
+      document
+    ) => {
+
+      setManagingDocumentId(
+        document.id
+      );
+
+      setSelectedBeneficiaryIds(
+        document
+          .assignedBeneficiaryIds ||
         []
-    );
+      );
 
-    setAccessMessage("");
-  };
+      setAccessMessage(
+        ""
+      );
+    };
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | CLOSE DOCUMENT ACCESS MANAGER
+  |--------------------------------------------------------------------------
+  */
 
   const closeAccessManager =
     () => {
+
       setManagingDocumentId(
         null
       );
@@ -381,73 +747,113 @@ export default function OwnerDashboard() {
         []
       );
 
-      setAccessMessage("");
+      setAccessMessage(
+        ""
+      );
     };
 
-  const toggleBeneficiary = (
-    beneficiaryId
-  ) => {
-    setSelectedBeneficiaryIds(
-      (current) =>
-        current.includes(
-          beneficiaryId
-        )
-          ? current.filter(
-              (id) =>
-                id !==
-                beneficiaryId
-            )
-          : [
-              ...current,
-              beneficiaryId,
-            ]
-    );
-  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | TOGGLE BENEFICIARY DOCUMENT ACCESS
+  |--------------------------------------------------------------------------
+  */
+
+  const toggleBeneficiary =
+    (
+      beneficiaryId
+    ) => {
+
+      setSelectedBeneficiaryIds(
+        (current) =>
+          current.includes(
+            beneficiaryId
+          )
+            ? current.filter(
+                (id) =>
+                  id !==
+                  beneficiaryId
+              )
+            : [
+                ...current,
+                beneficiaryId,
+              ]
+      );
+    };
+
+
+  /*
+  |--------------------------------------------------------------------------
+  | SAVE DOCUMENT ACCESS
+  |--------------------------------------------------------------------------
+  */
 
   const saveDocumentAccess =
-    async (documentId) => {
-      setAccessSaving(true);
+    async (
+      documentId
+    ) => {
 
-      setDocumentError("");
-      setAccessMessage("");
+      setAccessSaving(
+        true
+      );
+
+      setDocumentError(
+        ""
+      );
+
+      setAccessMessage(
+        ""
+      );
+
 
       try {
+
         const response =
           await fetch(
             `/api/documents/${documentId}/beneficiaries`,
             {
-              method: "PUT",
+              method:
+                "PUT",
 
               headers: {
                 "Content-Type":
                   "application/json",
 
-                Authorization: `Bearer ${token}`,
+                Authorization:
+                  `Bearer ${token}`,
               },
 
-              body: JSON.stringify(
-                {
+              body:
+                JSON.stringify({
                   beneficiaryIds:
                     selectedBeneficiaryIds,
-                }
-              ),
+                }),
             }
           );
+
 
         const data =
           await response.json();
 
-        if (!response.ok) {
+
+        if (
+          !response.ok
+        ) {
+
           throw new Error(
             data.message ||
-              "Failed to update document access."
+            "Failed to update document access."
           );
+
         }
+
 
         setDocuments(
           (current) =>
             current.map(
-              (document) =>
+              (
+                document
+              ) =>
                 document.id ===
                 documentId
                   ? data.document
@@ -455,10 +861,15 @@ export default function OwnerDashboard() {
             )
         );
 
+
         setAccessMessage(
           "Access updated successfully."
         );
-      } catch (saveError) {
+
+      } catch (
+        saveError
+      ) {
+
         console.error(
           "Document sharing error:",
           saveError
@@ -466,45 +877,71 @@ export default function OwnerDashboard() {
 
         setDocumentError(
           saveError.message ||
-            "Failed to update document access."
+          "Failed to update document access."
         );
+
       } finally {
-        setAccessSaving(false);
+
+        setAccessSaving(
+          false
+        );
+
       }
     };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | UI
+  |--------------------------------------------------------------------------
+  */
+
   return (
     <div className="min-h-screen bg-ink-50">
+
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-10">
 
-        {/* Dashboard Header */}
+
+        {/* DASHBOARD HEADER */}
+
         <section className="mb-8">
+
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
 
             <div>
+
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+
                 <ShieldCheck
                   size={14}
                 />
 
                 Owner Vault
+
               </div>
 
+
               <h1 className="text-3xl font-bold text-ink-900">
-                Welcome back,
-                {" "}
+
+                Welcome back,{" "}
+
                 {user?.name}
+
               </h1>
 
+
               <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500">
-                Manage your secure
-                documents, beneficiaries,
-                and sharing permissions
+
+                Manage your secure documents,
+                beneficiaries, and sharing permissions
                 from one place.
+
               </p>
+
             </div>
+
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 
@@ -514,11 +951,14 @@ export default function OwnerDashboard() {
                     size={18}
                   />
                 }
+
                 value={
                   documents.length
                 }
+
                 label="Documents"
               />
+
 
               <StatCard
                 icon={
@@ -526,49 +966,61 @@ export default function OwnerDashboard() {
                     size={18}
                   />
                 }
+
                 value={
                   beneficiaries.length
                 }
+
                 label="Beneficiaries"
               />
 
+
               <div className="hidden sm:block">
+
                 <StatCard
                   icon={
                     <LockKeyhole
                       size={18}
                     />
                   }
+
                   value="Secure"
+
                   label="Vault status"
                 />
+
               </div>
 
             </div>
+
           </div>
+
         </section>
 
 
-        {/* Document Vault */}
+        {/* DOCUMENT VAULT */}
+
         <section className="mb-8">
 
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
 
             <div>
+
               <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">
                 Document Vault
               </p>
+
 
               <h2 className="mt-1 text-2xl font-semibold text-ink-900">
                 Your secure documents
               </h2>
 
+
               <p className="mt-1 text-sm text-ink-500">
-                Upload files and control
-                exactly which
-                beneficiaries can view
-                them.
+                Upload files and control exactly
+                which beneficiaries can view them.
               </p>
+
             </div>
 
           </div>
@@ -576,7 +1028,9 @@ export default function OwnerDashboard() {
 
           <div className="grid gap-6 xl:grid-cols-[0.9fr_1.4fr]">
 
-            {/* Upload Panel */}
+
+            {/* UPLOAD PANEL */}
+
             <section className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
 
               <div className="border-b border-ink-100 bg-gradient-to-r from-brand-50 to-white px-6 py-5">
@@ -584,39 +1038,48 @@ export default function OwnerDashboard() {
                 <div className="flex items-center gap-3">
 
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
+
                     <UploadCloud
                       size={20}
                     />
+
                   </div>
 
+
                   <div>
+
                     <h3 className="font-semibold text-ink-900">
                       Upload document
                     </h3>
 
+
                     <p className="mt-0.5 text-xs text-ink-500">
-                      Add a new file to
-                      your encrypted
+                      Add a new file to your encrypted
                       document vault.
                     </p>
+
                   </div>
 
                 </div>
+
               </div>
 
 
               <div className="p-6">
+
                 <UploadDocument
                   onUploadSuccess={
                     loadDocuments
                   }
                 />
+
               </div>
 
             </section>
 
 
-            {/* My Documents */}
+            {/* MY DOCUMENTS */}
+
             <section className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
 
               <div className="flex items-center justify-between border-b border-ink-100 px-6 py-5">
@@ -624,26 +1087,38 @@ export default function OwnerDashboard() {
                 <div className="flex items-center gap-3">
 
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink-50 text-brand-700">
+
                     <FileText
                       size={20}
                     />
+
                   </div>
 
+
                   <div>
+
                     <h3 className="font-semibold text-ink-900">
                       My Documents
                     </h3>
 
+
                     <p className="mt-0.5 text-xs text-ink-500">
+
                       {
                         documents.length
                       }{" "}
+
                       stored{" "}
-                      {documents.length ===
-                      1
-                        ? "document"
-                        : "documents"}
+
+                      {
+                        documents.length ===
+                        1
+                          ? "document"
+                          : "documents"
+                      }
+
                     </p>
+
                   </div>
 
                 </div>
@@ -652,12 +1127,17 @@ export default function OwnerDashboard() {
                 {!documentsLoading &&
                   documents.length >
                     0 && (
+
                     <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+
                       {
                         documents.length
                       }{" "}
+
                       total
+
                     </span>
+
                   )}
 
               </div>
@@ -665,10 +1145,13 @@ export default function OwnerDashboard() {
 
               <div className="p-5 sm:p-6">
 
+
                 {documentError && (
+
                   <div className="alert-error mb-4">
                     {documentError}
                   </div>
+
                 )}
 
 
@@ -682,8 +1165,7 @@ export default function OwnerDashboard() {
                     />
 
                     <p className="text-sm">
-                      Loading your
-                      documents...
+                      Loading your documents...
                     </p>
 
                   </div>
@@ -694,22 +1176,25 @@ export default function OwnerDashboard() {
                   <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-ink-50/60 px-6 text-center">
 
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
+
                       <FolderLock
                         size={24}
                       />
+
                     </div>
+
 
                     <h4 className="mt-4 text-sm font-semibold text-ink-800">
                       Your vault is empty
                     </h4>
 
+
                     <p className="mt-2 max-w-sm text-xs leading-5 text-ink-400">
-                      Upload your first
-                      important document
-                      using the form on
-                      the left. It will
-                      appear here after
-                      upload.
+
+                      Upload your first important document
+                      using the form on the left. It will
+                      appear here after upload.
+
                     </p>
 
                   </div>
@@ -719,11 +1204,15 @@ export default function OwnerDashboard() {
                   <ul className="space-y-4">
 
                     {documents.map(
-                      (document) => {
+                      (
+                        document
+                      ) => {
+
 
                         const isManaging =
                           managingDocumentId ===
                           document.id;
+
 
                         const assignedCount =
                           document
@@ -731,11 +1220,19 @@ export default function OwnerDashboard() {
                             ?.length ||
                           0;
 
+
+                        const isDeleting =
+                          deletingDocumentId ===
+                          document.id;
+
+
                         return (
+
                           <li
                             key={
                               document.id
                             }
+
                             className="overflow-hidden rounded-2xl border border-ink-100 bg-white transition hover:border-ink-200 hover:shadow-sm"
                           >
 
@@ -743,14 +1240,17 @@ export default function OwnerDashboard() {
 
                               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 
+
+                                {/* DOCUMENT DETAILS */}
+
                                 <div className="flex min-w-0 gap-4">
 
                                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+
                                     <FileText
-                                      size={
-                                        20
-                                      }
+                                      size={20}
                                     />
+
                                   </div>
 
 
@@ -770,47 +1270,55 @@ export default function OwnerDashboard() {
                                           document.category
                                         )}`}
                                       >
+
                                         {
                                           document.category
                                         }
+
                                       </span>
 
                                     </div>
 
 
                                     <p className="mt-1 max-w-md truncate text-xs text-ink-400">
+
                                       {
                                         document.originalName
                                       }
+
                                     </p>
 
 
                                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-500">
 
                                       <span className="flex items-center gap-1.5">
+
                                         <CalendarDays
-                                          size={
-                                            13
-                                          }
+                                          size={13}
                                         />
 
-                                        {formatDate(
-                                          document.createdAt
-                                        )}
+                                        {
+                                          formatDate(
+                                            document.createdAt
+                                          )
+                                        }
+
                                       </span>
 
 
                                       <span className="flex items-center gap-1.5 font-medium text-brand-700">
+
                                         <Users
-                                          size={
-                                            13
-                                          }
+                                          size={13}
                                         />
 
-                                        {assignedCount ===
-                                        0
-                                          ? "Private"
-                                          : `Shared with ${assignedCount}`}
+                                        {
+                                          assignedCount ===
+                                          0
+                                            ? "Private"
+                                            : `Shared with ${assignedCount}`
+                                        }
+
                                       </span>
 
                                     </div>
@@ -820,29 +1328,47 @@ export default function OwnerDashboard() {
                                 </div>
 
 
+                                {/* DOCUMENT ACTIONS */}
+
                                 <div className="flex shrink-0 flex-wrap gap-2">
+
+
+                                  {/* VIEW */}
 
                                   <button
                                     type="button"
+
+                                    disabled={
+                                      isDeleting
+                                    }
+
                                     onClick={() =>
                                       viewDocument(
                                         document.id
                                       )
                                     }
-                                    className="btn-primary !px-3.5 !py-2"
+
+                                    className="btn-primary !px-3.5 !py-2 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
+
                                     <Eye
-                                      size={
-                                        15
-                                      }
+                                      size={15}
                                     />
 
                                     View
+
                                   </button>
 
 
+                                  {/* SHARE */}
+
                                   <button
                                     type="button"
+
+                                    disabled={
+                                      isDeleting
+                                    }
+
                                     onClick={() =>
                                       isManaging
                                         ? closeAccessManager()
@@ -850,26 +1376,90 @@ export default function OwnerDashboard() {
                                             document
                                           )
                                     }
-                                    className="btn-secondary !px-3.5 !py-2"
+
+                                    className="btn-secondary !px-3.5 !py-2 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
 
                                     {isManaging ? (
+
                                       <ChevronUp
-                                        size={
-                                          15
-                                        }
+                                        size={15}
                                       />
+
                                     ) : (
+
                                       <Share2
-                                        size={
-                                          15
-                                        }
+                                        size={15}
                                       />
+
                                     )}
 
-                                    {isManaging
-                                      ? "Close"
-                                      : "Share"}
+
+                                    {
+                                      isManaging
+                                        ? "Close"
+                                        : "Share"
+                                    }
+
+                                  </button>
+
+
+                                  {/* DELETE */}
+
+                                  <button
+                                    type="button"
+
+                                    disabled={
+                                      isDeleting
+                                    }
+
+                                    onClick={() =>
+                                      deleteDocument(
+                                        document
+                                      )
+                                    }
+
+                                    className="
+                                      inline-flex
+                                      items-center
+                                      gap-2
+                                      rounded-lg
+                                      border
+                                      border-red-200
+                                      bg-red-50
+                                      px-3.5
+                                      py-2
+                                      text-sm
+                                      font-semibold
+                                      text-red-600
+                                      transition
+                                      hover:bg-red-100
+                                      disabled:cursor-not-allowed
+                                      disabled:opacity-60
+                                    "
+                                  >
+
+                                    {isDeleting ? (
+
+                                      <Loader2
+                                        size={15}
+                                        className="animate-spin"
+                                      />
+
+                                    ) : (
+
+                                      <Trash2
+                                        size={15}
+                                      />
+
+                                    )}
+
+
+                                    {
+                                      isDeleting
+                                        ? "Deleting..."
+                                        : "Delete"
+                                    }
 
                                   </button>
 
@@ -880,7 +1470,8 @@ export default function OwnerDashboard() {
                             </div>
 
 
-                            {/* Access Manager */}
+                            {/* ACCESS MANAGER */}
+
                             {isManaging && (
 
                               <div className="border-t border-ink-100 bg-ink-50/60 px-5 py-5">
@@ -888,28 +1479,27 @@ export default function OwnerDashboard() {
                                 <div className="flex items-start gap-3">
 
                                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-brand-700 shadow-sm">
+
                                     <UserRoundCheck
-                                      size={
-                                        17
-                                      }
+                                      size={17}
                                     />
+
                                   </div>
 
 
                                   <div>
 
                                     <p className="text-sm font-semibold text-ink-800">
-                                      Document
-                                      access
+                                      Document access
                                     </p>
 
+
                                     <p className="mt-1 text-xs leading-5 text-ink-500">
-                                      Select the
-                                      beneficiaries
-                                      who should
-                                      be allowed
-                                      to view this
-                                      document.
+
+                                      Select the beneficiaries
+                                      who should be allowed to
+                                      view this document.
+
                                     </p>
 
                                   </div>
@@ -923,17 +1513,15 @@ export default function OwnerDashboard() {
                                   <div className="mt-4 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-5 text-center">
 
                                     <p className="text-sm font-medium text-ink-700">
-                                      No
-                                      beneficiaries
-                                      available
+                                      No beneficiaries available
                                     </p>
 
+
                                     <p className="mt-1 text-xs text-ink-400">
-                                      Create a
-                                      beneficiary
-                                      first before
-                                      assigning
-                                      access.
+
+                                      Create a beneficiary first
+                                      before assigning access.
+
                                     </p>
 
                                   </div>
@@ -947,16 +1535,20 @@ export default function OwnerDashboard() {
                                         beneficiary
                                       ) => {
 
+
                                         const selected =
                                           selectedBeneficiaryIds.includes(
                                             beneficiary.id
                                           );
 
+
                                         return (
+
                                           <label
                                             key={
                                               beneficiary.id
                                             }
+
                                             className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 transition ${
                                               selected
                                                 ? "border-brand-200 bg-brand-50"
@@ -966,10 +1558,13 @@ export default function OwnerDashboard() {
 
                                             <input
                                               type="checkbox"
+
                                               className="h-4 w-4 accent-brand-600"
+
                                               checked={
                                                 selected
                                               }
+
                                               onChange={() =>
                                                 toggleBeneficiary(
                                                   beneficiary.id
@@ -977,25 +1572,33 @@ export default function OwnerDashboard() {
                                               }
                                             />
 
+
                                             <div className="min-w-0">
 
                                               <p className="truncate text-sm font-semibold text-ink-800">
+
                                                 {
                                                   beneficiary.name
                                                 }
+
                                               </p>
 
+
                                               <p className="truncate text-xs text-ink-400">
+
                                                 @
                                                 {
                                                   beneficiary.username
                                                 }
+
                                               </p>
 
                                             </div>
 
                                           </label>
+
                                         );
+
                                       }
                                     )}
 
@@ -1005,11 +1608,11 @@ export default function OwnerDashboard() {
 
 
                                 {accessMessage && (
+
                                   <div className="alert-success mt-4">
-                                    {
-                                      accessMessage
-                                    }
+                                    {accessMessage}
                                   </div>
+
                                 )}
 
 
@@ -1017,12 +1620,15 @@ export default function OwnerDashboard() {
 
                                   <button
                                     type="button"
+
                                     onClick={() =>
                                       saveDocumentAccess(
                                         document.id
                                       )
                                     }
+
                                     className="btn-primary"
+
                                     disabled={
                                       accessSaving ||
                                       beneficiaries.length ===
@@ -1031,41 +1637,46 @@ export default function OwnerDashboard() {
                                   >
 
                                     {accessSaving ? (
+
                                       <Loader2
-                                        size={
-                                          16
-                                        }
+                                        size={16}
                                         className="animate-spin"
                                       />
+
                                     ) : (
+
                                       <Save
-                                        size={
-                                          16
-                                        }
+                                        size={16}
                                       />
+
                                     )}
 
-                                    {accessSaving
-                                      ? "Saving..."
-                                      : "Save Access"}
+
+                                    {
+                                      accessSaving
+                                        ? "Saving..."
+                                        : "Save Access"
+                                    }
 
                                   </button>
 
 
                                   <button
                                     type="button"
+
                                     onClick={
                                       closeAccessManager
                                     }
+
                                     className="btn-secondary"
                                   >
+
                                     <X
-                                      size={
-                                        15
-                                      }
+                                      size={15}
                                     />
 
                                     Cancel
+
                                   </button>
 
                                 </div>
@@ -1075,7 +1686,9 @@ export default function OwnerDashboard() {
                             )}
 
                           </li>
+
                         );
+
                       }
                     )}
 
@@ -1092,34 +1705,44 @@ export default function OwnerDashboard() {
         </section>
 
 
-        {/* Beneficiary Management */}
+        {/* BENEFICIARY MANAGEMENT */}
+
         <section>
 
           <div className="mb-4 flex items-end justify-between gap-4">
 
             <div>
+
               <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">
                 Trusted People
               </p>
+
 
               <h2 className="mt-1 text-2xl font-semibold text-ink-900">
                 Beneficiaries
               </h2>
 
+
               <p className="mt-1 text-sm text-ink-500">
-                Create and manage the
-                accounts that may receive
-                document access.
+
+                Create and manage the accounts
+                that may receive document access.
+
               </p>
+
             </div>
 
 
             <button
               type="button"
+
               className="btn-primary"
+
               onClick={() =>
                 setBeneficiaryFormOpen(
-                  (current) =>
+                  (
+                    current
+                  ) =>
                     !current
                 )
               }
@@ -1129,18 +1752,26 @@ export default function OwnerDashboard() {
                 size={16}
               />
 
-              {beneficiaryFormOpen
-                ? "Close Form"
-                : "Add Beneficiary"}
+
+              {
+                beneficiaryFormOpen
+                  ? "Close Form"
+                  : "Add Beneficiary"
+              }
+
 
               {beneficiaryFormOpen ? (
+
                 <ChevronUp
                   size={15}
                 />
+
               ) : (
+
                 <ChevronDown
                   size={15}
                 />
+
               )}
 
             </button>
@@ -1156,7 +1787,9 @@ export default function OwnerDashboard() {
             }`}
           >
 
-            {/* Beneficiaries */}
+
+            {/* BENEFICIARY LIST */}
+
             <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-card">
 
               <div className="mb-5 flex items-center justify-between">
@@ -1164,23 +1797,31 @@ export default function OwnerDashboard() {
                 <div className="flex items-center gap-3">
 
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+
                     <Users
                       size={18}
                     />
+
                   </div>
 
+
                   <div>
+
                     <h3 className="font-semibold text-ink-900">
-                      Your
-                      Beneficiaries
+                      Your Beneficiaries
                     </h3>
 
+
                     <p className="text-xs text-ink-400">
+
                       {
                         beneficiaries.length
                       }{" "}
+
                       registered
+
                     </p>
+
                   </div>
 
                 </div>
@@ -1197,8 +1838,7 @@ export default function OwnerDashboard() {
                     className="animate-spin"
                   />
 
-                  Loading
-                  beneficiaries...
+                  Loading beneficiaries...
 
                 </div>
 
@@ -1212,14 +1852,17 @@ export default function OwnerDashboard() {
                     className="mx-auto text-ink-300"
                   />
 
+
                   <p className="mt-3 text-sm font-semibold text-ink-700">
                     No beneficiaries yet
                   </p>
 
+
                   <p className="mt-1 text-xs text-ink-400">
-                    Add someone you trust
-                    to begin assigning
-                    document access.
+
+                    Add someone you trust to begin
+                    assigning document access.
+
                   </p>
 
                 </div>
@@ -1237,6 +1880,7 @@ export default function OwnerDashboard() {
                         key={
                           beneficiary.id
                         }
+
                         className="rounded-2xl border border-ink-100 p-4 transition hover:border-ink-200 hover:bg-ink-50/50"
                       >
 
@@ -1245,12 +1889,16 @@ export default function OwnerDashboard() {
                           <div className="flex min-w-0 items-center gap-3">
 
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-700">
-                              {beneficiary.name
-                                ?.charAt(
-                                  0
-                                )
-                                ?.toUpperCase() ||
-                                "B"}
+
+                              {
+                                beneficiary.name
+                                  ?.charAt(
+                                    0
+                                  )
+                                  ?.toUpperCase() ||
+                                "B"
+                              }
+
                             </div>
 
 
@@ -1262,11 +1910,14 @@ export default function OwnerDashboard() {
                                 }
                               </p>
 
+
                               <p className="truncate text-xs text-ink-400">
+
                                 @
                                 {
                                   beneficiary.username
                                 }
+
                               </p>
 
                             </div>
@@ -1274,17 +1925,18 @@ export default function OwnerDashboard() {
                           </div>
 
 
-                          {beneficiary.mustChangePassword ? (
+                          {beneficiary
+                            .mustChangePassword ? (
 
                             <span className="badge shrink-0 bg-amber-50 text-amber-700">
+
                               <Key
-                                size={
-                                  11
-                                }
+                                size={11}
                                 className="mr-1"
                               />
 
                               Pending
+
                             </span>
 
                           ) : (
@@ -1304,11 +1956,17 @@ export default function OwnerDashboard() {
                           }
                         </p>
 
+
                         <p className="mt-1 text-[11px] text-ink-400">
+
                           Created{" "}
-                          {formatDate(
-                            beneficiary.createdAt
-                          )}
+
+                          {
+                            formatDate(
+                              beneficiary.createdAt
+                            )
+                          }
+
                         </p>
 
                       </div>
@@ -1323,7 +1981,8 @@ export default function OwnerDashboard() {
             </section>
 
 
-            {/* Create Beneficiary */}
+            {/* CREATE BENEFICIARY */}
+
             {beneficiaryFormOpen && (
 
               <section className="rounded-2xl border border-ink-100 bg-white p-6 shadow-card">
@@ -1334,11 +1993,12 @@ export default function OwnerDashboard() {
                     Create Beneficiary
                   </h3>
 
+
                   <p className="mt-1 text-xs leading-5 text-ink-500">
-                    Beneficiaries cannot
-                    self-register. Create
-                    their initial
-                    credentials here.
+
+                    Beneficiaries cannot self-register.
+                    Create their initial credentials here.
+
                   </p>
 
                 </div>
@@ -1348,251 +2008,306 @@ export default function OwnerDashboard() {
                   onSubmit={
                     handleSubmit
                   }
+
                   className="space-y-4"
                 >
 
+
                   {error && (
+
                     <div className="alert-error">
                       {error}
                     </div>
+
                   )}
 
 
                   {success && (
+
                     <div className="alert-success flex items-center gap-2">
+
                       <CheckCircle2
-                        size={
-                          16
-                        }
+                        size={16}
                       />
 
                       {success}
+
                     </div>
+
                   )}
 
+
+                  {/* NAME */}
 
                   <div>
 
                     <label
                       className="field-label"
+
                       htmlFor="b-name"
                     >
                       Full Name
                     </label>
 
+
                     <input
                       id="b-name"
+
                       className="field-input"
+
                       value={
                         form.name
                       }
-                      onChange={update(
-                        "name"
-                      )}
+
+                      onChange={
+                        update(
+                          "name"
+                        )
+                      }
+
                       required
                     />
 
                   </div>
 
 
+                  {/* USERNAME */}
+
                   <div>
 
                     <label
                       className="field-label"
+
                       htmlFor="b-username"
                     >
                       Username
                     </label>
 
+
                     <input
                       id="b-username"
+
                       className="field-input"
+
                       value={
                         form.username
                       }
-                      onChange={update(
-                        "username"
-                      )}
+
+                      onChange={
+                        update(
+                          "username"
+                        )
+                      }
+
                       required
                     />
 
                   </div>
 
 
+                  {/* EMAIL */}
+
                   <div>
 
                     <label
                       className="field-label"
+
                       htmlFor="b-email"
                     >
                       Email
                     </label>
 
+
                     <input
                       id="b-email"
+
                       type="email"
+
                       className="field-input"
+
                       value={
                         form.email
                       }
-                      onChange={update(
-                        "email"
-                      )}
+
+                      onChange={
+                        update(
+                          "email"
+                        )
+                      }
+
                       required
                     />
 
                   </div>
 
-                      <div>
 
-  <label
-    className="field-label"
-    htmlFor="b-aadhaar"
-  >
-    Beneficiary Aadhaar
-  </label>
-
-  <label
-    htmlFor="b-aadhaar"
-    className="
-      mt-1
-      flex
-      cursor-pointer
-      flex-col
-      items-center
-      justify-center
-      rounded-xl
-      border
-      border-dashed
-      border-ink-200
-      bg-ink-50/60
-      px-4
-      py-5
-      text-center
-      transition
-      hover:border-brand-300
-      hover:bg-brand-50/50
-    "
-  >
-
-    <UploadCloud
-      size={24}
-      className="
-        mb-2
-        text-brand-600
-      "
-    />
-
-    {form.aadhaar ? (
-
-      <>
-        <p className="
-          max-w-full
-          truncate
-          text-sm
-          font-semibold
-          text-ink-800
-        ">
-          {form.aadhaar.name}
-        </p>
-
-        <p className="
-          mt-1
-          text-xs
-          font-medium
-          text-green-600
-        ">
-          Aadhaar selected
-        </p>
-      </>
-
-    ) : (
-
-      <>
-        <p className="
-          text-sm
-          font-semibold
-          text-ink-700
-        ">
-          Upload Aadhaar Card
-        </p>
-
-        <p className="
-          mt-1
-          text-xs
-          text-ink-400
-        ">
-          JPG, PNG or PDF
-        </p>
-      </>
-
-    )}
-
-  </label>
-
-  <input
-    id="b-aadhaar"
-    type="file"
-    accept="image/jpeg,image/png,application/pdf"
-    className="hidden"
-    onChange={(e) => {
-
-      const file =
-        e.target.files?.[0] ||
-        null;
-
-      setForm(
-        (current) => ({
-          ...current,
-          aadhaar:
-            file,
-        })
-      );
-
-    }}
-    required
-  />
-
-  <p className="
-    mt-1.5
-    text-xs
-    leading-5
-    text-ink-400
-  ">
-    Upload the Beneficiary's Aadhaar
-    card for identity verification.
-  </p>
-
-</div>
-
+                  {/* AADHAAR */}
 
                   <div>
 
                     <label
                       className="field-label"
+
+                      htmlFor="b-aadhaar"
+                    >
+                      Beneficiary Aadhaar
+                    </label>
+
+
+                    <label
+                      htmlFor="b-aadhaar"
+
+                      className="
+                        mt-1
+                        flex
+                        cursor-pointer
+                        flex-col
+                        items-center
+                        justify-center
+                        rounded-xl
+                        border
+                        border-dashed
+                        border-ink-200
+                        bg-ink-50/60
+                        px-4
+                        py-5
+                        text-center
+                        transition
+                        hover:border-brand-300
+                        hover:bg-brand-50/50
+                      "
+                    >
+
+                      <UploadCloud
+                        size={24}
+                        className="mb-2 text-brand-600"
+                      />
+
+
+                      {form.aadhaar ? (
+
+                        <>
+
+                          <p className="max-w-full truncate text-sm font-semibold text-ink-800">
+
+                            {
+                              form.aadhaar.name
+                            }
+
+                          </p>
+
+
+                          <p className="mt-1 text-xs font-medium text-green-600">
+                            Aadhaar selected
+                          </p>
+
+                        </>
+
+                      ) : (
+
+                        <>
+
+                          <p className="text-sm font-semibold text-ink-700">
+                            Upload Aadhaar Card
+                          </p>
+
+
+                          <p className="mt-1 text-xs text-ink-400">
+                            JPG, PNG or PDF
+                          </p>
+
+                        </>
+
+                      )}
+
+                    </label>
+
+
+                    <input
+                      id="b-aadhaar"
+
+                      type="file"
+
+                      accept="image/jpeg,image/png,application/pdf"
+
+                      className="hidden"
+
+                      onChange={(
+                        e
+                      ) => {
+
+                        const file =
+                          e.target
+                            .files?.[0] ||
+                          null;
+
+
+                        setForm(
+                          (
+                            current
+                          ) => ({
+                            ...current,
+
+                            aadhaar:
+                              file,
+                          })
+                        );
+
+                      }}
+
+                      required
+                    />
+
+
+                    <p className="mt-1.5 text-xs leading-5 text-ink-400">
+
+                      Upload the Beneficiary's Aadhaar
+                      card for identity verification.
+
+                    </p>
+
+                  </div>
+
+
+                  {/* PASSWORD */}
+
+                  <div>
+
+                    <label
+                      className="field-label"
+
                       htmlFor="b-pass"
                     >
                       Initial Password
                     </label>
 
+
                     <input
                       id="b-pass"
+
                       type="password"
+
                       className="field-input"
+
                       value={
                         form.initialPassword
                       }
-                      onChange={update(
-                        "initialPassword"
-                      )}
+
+                      onChange={
+                        update(
+                          "initialPassword"
+                        )
+                      }
+
                       required
                     />
 
+
                     <p className="mt-1.5 text-xs text-ink-400">
-                      The beneficiary
-                      must change this
-                      password after
-                      their first login.
+
+                      The beneficiary must change this
+                      password after their first login.
+
                     </p>
 
                   </div>
@@ -1600,30 +2315,35 @@ export default function OwnerDashboard() {
 
                   <button
                     type="submit"
+
                     className="btn-primary w-full"
+
                     disabled={
                       loading
                     }
                   >
 
                     {loading ? (
+
                       <Loader2
-                        size={
-                          16
-                        }
+                        size={16}
                         className="animate-spin"
                       />
+
                     ) : (
+
                       <UserPlus
-                        size={
-                          16
-                        }
+                        size={16}
                       />
+
                     )}
 
-                    {loading
-                      ? "Creating..."
-                      : "Create Beneficiary"}
+
+                    {
+                      loading
+                        ? "Creating..."
+                        : "Create Beneficiary"
+                    }
 
                   </button>
 
@@ -1638,30 +2358,38 @@ export default function OwnerDashboard() {
         </section>
 
       </main>
+
     </div>
   );
 }
+
 
 function StatCard({
   icon,
   value,
   label,
 }) {
+
   return (
+
     <div className="min-w-[120px] rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm">
 
       <div className="flex items-center gap-2 text-brand-700">
+
         {icon}
 
         <span className="text-lg font-bold text-ink-900">
           {value}
         </span>
+
       </div>
+
 
       <p className="mt-1 text-xs text-ink-400">
         {label}
       </p>
 
     </div>
+
   );
 }

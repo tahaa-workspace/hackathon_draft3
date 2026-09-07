@@ -6,6 +6,7 @@ import {
     getAssignedDocuments,
     updateDocumentBeneficiaries,
     getDocumentAccessUrl,
+    deleteDocument,
 } from "../controllers/documentController.js";
 
 import upload from "../middleware/uploadMiddleware.js";
@@ -81,4 +82,18 @@ router.get(
     getDocumentAccessUrl
 );
 
+
+
+/*
+=================================
+DELETE OWNER DOCUMENT
+DELETE /api/documents/:id
+=================================
+*/
+router.delete(
+    "/:id",
+    protect,
+    authorize("OWNER"),
+    deleteDocument
+);
 export default router;
