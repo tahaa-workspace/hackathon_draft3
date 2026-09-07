@@ -1,40 +1,82 @@
 import mongoose from "mongoose";
 
-const passwordChangeOTPSchema = new mongoose.Schema(
-    {
-        userId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-            unique: true,
-        },
+const passwordChangeOTPSchema =
+    new mongoose.Schema(
+        {
+            userId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User",
+                required: true,
+                unique: true,
+                index: true,
+            },
 
-        otpHash: {
-            type: String,
-            required: true,
-        },
+            /*
+            =========================================
+            OTP
+            =========================================
+            */
 
-        // New password is stored only as a bcrypt hash.
-        // Plain password is NEVER stored.
-        newPasswordHash: {
-            type: String,
-            required: true,
-        },
+            otpHash: {
+                type: String,
+                required: true,
+            },
 
-        expiresAt: {
-            type: Date,
-            required: true,
-        },
+            /*
+            OTP expires after 5 minutes.
+            */
 
-        attempts: {
-            type: Number,
-            default: 0,
+            expiresAt: {
+                type: Date,
+                required: true,
+            },
+
+            /*
+            Invalid OTP attempts.
+            Maximum = 5.
+            */
+
+            attempts: {
+                type: Number,
+                default: 0,
+            },
+
+            /*
+            Initial OTP email does NOT count.
+
+            resendCount:
+            0 = no resend used
+            1 = first resend used
+            2 = second resend used
+
+            More than 2 is blocked.
+            */
+
+            resendCount: {
+                type: Number,
+                default: 0,
+            },
+
+            /*
+            =========================================
+            OTP VERIFICATION STATE
+            =========================================
+            */
+
+            otpVerified: {
+                type: Boolean,
+                default: false,
+            },
+
+            verifiedAt: {
+                type: Date,
+                default: null,
+            },
         },
-    },
-    {
-        timestamps: true,
-    }
-);
+        {
+            timestamps: true,
+        }
+    );
 
 export default mongoose.model(
     "PasswordChangeOTP",

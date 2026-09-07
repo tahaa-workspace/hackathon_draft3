@@ -4,9 +4,9 @@ import {
     register,
     registerLawyer,
     login,
-    //changePassword,
     requestPasswordChangeOTP,
     verifyPasswordChangeOTP,
+    completePasswordChange,
 } from "../controllers/authController.js";
 
 import protect from "../middleware/authMiddleware.js";
@@ -14,7 +14,12 @@ import upload from "../middleware/uploadMiddleware.js";
 
 const router = Router();
 
-// Registration
+/*
+=========================================================
+REGISTRATION
+=========================================================
+*/
+
 router.post(
     "/register",
     upload.single("aadhaar"),
@@ -27,28 +32,56 @@ router.post(
     registerLawyer
 );
 
-// Login
-router.post("/login", login);
 
-// Existing normal password change route
-// router.post(
-//     "/change-password",
-//     protect,
-//     changePassword
-// );
+/*
+=========================================================
+LOGIN
+=========================================================
+*/
 
-// MFA - Request OTP for password change
+router.post(
+    "/login",
+    login
+);
+
+
+/*
+=========================================================
+PASSWORD CHANGE - SEND / RESEND OTP
+=========================================================
+*/
+
 router.post(
     "/change-password/request-otp",
     protect,
     requestPasswordChangeOTP
 );
 
-// MFA - Verify OTP and finally change password
+
+/*
+=========================================================
+PASSWORD CHANGE - VERIFY OTP
+=========================================================
+*/
+
 router.post(
     "/change-password/verify-otp",
     protect,
     verifyPasswordChangeOTP
 );
+
+
+/*
+=========================================================
+PASSWORD CHANGE - COMPLETE
+=========================================================
+*/
+
+router.post(
+    "/change-password/complete",
+    protect,
+    completePasswordChange
+);
+
 
 export default router;

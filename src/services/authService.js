@@ -160,20 +160,6 @@ export async function loginUser({
 }
 
 
-export async function changePassword({
-  currentPassword,
-  newPassword,
-  confirmNewPassword,
-}) {
-  return request('/auth/change-password', {
-    method: 'POST',
-    body: {
-      currentPassword,
-      newPassword,
-      confirmNewPassword,
-    },
-  });
-}
 
 
 /* =========================================================
@@ -366,68 +352,68 @@ export function loadStoredSession() {
 }
 
 
-export async function requestPasswordChangeOTP(
-    currentPassword,
-    newPassword,
-    token
-) {
-    const response = await fetch(
-        "/api/auth/change-password/request-otp",
+
+/* =========================================================
+   PASSWORD CHANGE
+   ========================================================= */
+
+/*
+ * Send initial OTP or resend OTP.
+ *
+ * Authentication comes from authHeaders(),
+ * therefore the frontend does not need to send
+ * the registered email or token manually.
+ */
+
+export async function requestPasswordChangeOTP() {
+    return request(
+        "/auth/change-password/request-otp",
         {
             method: "POST",
-
-            headers: {
-                "Content-Type": "application/json",
-
-                Authorization: `Bearer ${token}`,
-            },
-
-            body: JSON.stringify({
-                currentPassword,
-                newPassword,
-            }),
         }
     );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(
-            data.message || "Failed to request OTP."
-        );
-    }
-
-    return data;
 }
 
+
+/*
+ * Verify the 6-digit OTP.
+ */
+
 export async function verifyPasswordChangeOTP(
-    otp,
-    token
+    otp
 ) {
-    const response = await fetch(
-        "/api/auth/change-password/verify-otp",
+    return request(
+        "/auth/change-password/verify-otp",
         {
             method: "POST",
 
-            headers: {
-                "Content-Type": "application/json",
-
-                Authorization: `Bearer ${token}`,
-            },
-
-            body: JSON.stringify({
+            body: {
                 otp,
-            }),
+            },
         }
     );
+}
 
-    const data = await response.json();
 
-    if (!response.ok) {
-        throw new Error(
-            data.message || "OTP verification failed."
-        );
-    }
+/*
+ * Complete password change after OTP verification.
+ */
 
-    return data;
+export async function completePasswordChange({
+    currentPassword,
+    newPassword,
+    confirmNewPassword,
+}) {
+    return request(
+        "/auth/change-password/complete",
+        {
+            method: "POST",
+
+            body: {
+                currentPassword,
+                newPassword,
+                confirmNewPassword,
+            },
+        }
+    );
 }
