@@ -237,16 +237,50 @@ export async function createBeneficiary({
   username,
   email,
   initialPassword,
+  aadhaar,
 }) {
-  return request('/beneficiaries', {
-    method: 'POST',
-    body: {
-      name,
-      username,
-      email,
-      initialPassword,
-    },
-  });
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    'name',
+    name
+  );
+
+  formData.append(
+    'username',
+    username
+  );
+
+  formData.append(
+    'email',
+    email
+  );
+
+  formData.append(
+    'initialPassword',
+    initialPassword
+  );
+
+  formData.append(
+    'aadhaar',
+    aadhaar
+  );
+
+  return request(
+    '/beneficiaries',
+    {
+      method:
+        'POST',
+
+      body:
+        formData,
+
+      isForm:
+        true,
+    }
+  );
 }
 
 

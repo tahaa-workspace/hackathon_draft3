@@ -1,8 +1,59 @@
 import bcrypt from 'bcryptjs';
+import streamifier from 'streamifier';
+
 import User from '../models/User.js';
 import transporter from '../config/mailer.js';
+import cloudinary from '../config/cloudinary.js';
 
 const SALT_ROUNDS = 12;
+/*
+=========================================================
+UPLOAD BENEFICIARY AADHAAR
+=========================================================
+*/
+
+function uploadBeneficiaryAadhaar(file) {
+  return new Promise(
+    (resolve, reject) => {
+
+      const uploadStream =
+        cloudinary.uploader.upload_stream(
+          {
+            folder:
+              'digital-legacy/beneficiary-aadhaar',
+
+            resource_type:
+              'auto',
+
+            type:
+              'authenticated',
+
+            use_filename:
+              false,
+
+            unique_filename:
+              true,
+          },
+
+          (error, result) => {
+
+            if (error) {
+              reject(error);
+            } else {
+              resolve(result);
+            }
+
+          }
+        );
+
+      streamifier
+        .createReadStream(
+          file.buffer
+        )
+        .pipe(uploadStream);
+    }
+  );
+}
 
 async function sendBeneficiaryCredentialsEmail({
   recipientEmail,
@@ -164,14 +215,27 @@ ${appName}
   });
 }
 
-export async function createBeneficiary(req, res) {
+export async function createBeneficiary(
+  req,
+  res
+) {
+
+  let aadhaarUpload = null;
+
   try {
+
     const {
       name,
       username,
       email,
       initialPassword,
     } = req.body;
+
+    /*
+    =========================================
+    VALIDATE TEXT FIELDS
+    =========================================
+    */
 
     if (
       !name ||
@@ -185,12 +249,39 @@ export async function createBeneficiary(req, res) {
       });
     }
 
-    if (initialPassword.length < 8) {
+    /*
+    =========================================
+    BENEFICIARY AADHAAR REQUIRED
+    =========================================
+    */
+
+    if (!req.file) {
+      return res.status(400).json({
+        message:
+          'Beneficiary Aadhaar card image or PDF is required.',
+      });
+    }
+
+    /*
+    =========================================
+    PASSWORD VALIDATION
+    =========================================
+    */
+
+    if (
+      initialPassword.length < 8
+    ) {
       return res.status(400).json({
         message:
           'Initial password must be at least 8 characters long.',
       });
     }
+
+    /*
+    =========================================
+    NORMALIZE LOGIN DETAILS
+    =========================================
+    */
 
     const normalizedEmail =
       String(email)
@@ -199,7 +290,14 @@ export async function createBeneficiary(req, res) {
 
     const normalizedUsername =
       String(username)
-        .trim();
+        .trim()
+        .toLowerCase();
+
+    /*
+    =========================================
+    CHECK DUPLICATE ACCOUNT
+    =========================================
+    */
 
     const existing =
       await User.findOne({
@@ -222,12 +320,45 @@ export async function createBeneficiary(req, res) {
       });
     }
 
+    /*
+    =========================================
+    GET OWNER
+    =========================================
+    */
+
     const owner =
       await User.findById(
         req.user.id
       ).select(
-        'name username email'
+        'name username email role status'
       );
+
+    if (
+      !owner ||
+      owner.role !== 'OWNER'
+    ) {
+      return res.status(403).json({
+        message:
+          'Only an Owner can create a Beneficiary.',
+      });
+    }
+
+    /*
+    =========================================
+    UPLOAD BENEFICIARY AADHAAR
+    =========================================
+    */
+
+    aadhaarUpload =
+      await uploadBeneficiaryAadhaar(
+        req.file
+      );
+
+    /*
+    =========================================
+    HASH TEMPORARY PASSWORD
+    =========================================
+    */
 
     const passwordHash =
       await bcrypt.hash(
@@ -235,8 +366,15 @@ export async function createBeneficiary(req, res) {
         SALT_ROUNDS
       );
 
+    /*
+    =========================================
+    CREATE BENEFICIARY
+    =========================================
+    */
+
     const beneficiary =
       await User.create({
+
         name:
           String(name).trim(),
 
@@ -251,6 +389,15 @@ export async function createBeneficiary(req, res) {
         role:
           'BENEFICIARY',
 
+        /*
+        Beneficiary is still activated directly
+        by the Owner.
+
+        Aadhaar upload does NOT send this account
+        through Admin approval unless you later
+        decide to add that workflow.
+        */
+
         status:
           'ACTIVE',
 
@@ -259,16 +406,42 @@ export async function createBeneficiary(req, res) {
 
         mustChangePassword:
           true,
+
+        /*
+        =========================================
+        AADHAAR METADATA
+        =========================================
+        */
+
+        aadhaarDocument: {
+
+          publicId:
+            aadhaarUpload.public_id,
+
+          resourceType:
+            aadhaarUpload.resource_type,
+
+          originalName:
+            req.file.originalname,
+
+          mimeType:
+            req.file.mimetype,
+
+          fileSize:
+            req.file.size,
+        },
       });
 
     /*
-    |--------------------------------------------------------------------------
-    | SEND CREDENTIAL EMAIL
-    |--------------------------------------------------------------------------
+    =========================================
+    SEND BENEFICIARY CREDENTIALS EMAIL
+    =========================================
     */
 
     try {
+
       await sendBeneficiaryCredentialsEmail({
+
         recipientEmail:
           beneficiary.email,
 
@@ -281,32 +454,35 @@ export async function createBeneficiary(req, res) {
         initialPassword,
 
         ownerName:
-          owner?.name ||
-          owner?.username ||
+          owner.name ||
+          owner.username ||
           'Your account owner',
       });
 
     } catch (mailError) {
+
       console.error(
         'Beneficiary credential email failed:',
         mailError
       );
 
       /*
-       * The beneficiary has already been created.
-       *
-       * We do NOT delete the account just because email failed.
-       * The API returns success with an email warning.
-       */
+      Beneficiary + Aadhaar already exist.
+
+      Do NOT delete the account merely because
+      email delivery failed.
+      */
 
       return res.status(201).json({
+
         message:
-          'Beneficiary created successfully, but the credential email could not be sent.',
+          'Beneficiary created and Aadhaar stored securely, but the credential email could not be sent.',
 
         emailSent:
           false,
 
         beneficiary: {
+
           id:
             beneficiary._id.toString(),
 
@@ -328,6 +504,13 @@ export async function createBeneficiary(req, res) {
           mustChangePassword:
             beneficiary.mustChangePassword,
 
+          aadhaarAvailable:
+            Boolean(
+              beneficiary
+                .aadhaarDocument
+                ?.publicId
+            ),
+
           createdBy:
             beneficiary.createdBy
               ? beneficiary.createdBy.toString()
@@ -339,14 +522,22 @@ export async function createBeneficiary(req, res) {
       });
     }
 
+    /*
+    =========================================
+    SUCCESS
+    =========================================
+    */
+
     return res.status(201).json({
+
       message:
-        'Beneficiary created successfully. Login credentials have been sent to their email address.',
+        'Beneficiary created successfully. Aadhaar has been stored securely and login credentials were sent to their email address.',
 
       emailSent:
         true,
 
       beneficiary: {
+
         id:
           beneficiary._id.toString(),
 
@@ -368,6 +559,13 @@ export async function createBeneficiary(req, res) {
         mustChangePassword:
           beneficiary.mustChangePassword,
 
+        aadhaarAvailable:
+          Boolean(
+            beneficiary
+              .aadhaarDocument
+              ?.publicId
+          ),
+
         createdBy:
           beneficiary.createdBy
             ? beneficiary.createdBy.toString()
@@ -379,14 +577,57 @@ export async function createBeneficiary(req, res) {
     });
 
   } catch (error) {
+
     console.error(
       'Create beneficiary error:',
       error
     );
 
+    /*
+    =========================================
+    CLEANUP CLOUDINARY
+    =========================================
+
+    If Aadhaar uploaded successfully but MongoDB
+    beneficiary creation failed, remove the orphan
+    Aadhaar document.
+    */
+
+    if (
+      aadhaarUpload?.public_id
+    ) {
+
+      await cloudinary.uploader
+        .destroy(
+          aadhaarUpload.public_id,
+          {
+            resource_type:
+              aadhaarUpload.resource_type ||
+              'image',
+
+            type:
+              'authenticated',
+
+            invalidate:
+              true,
+          }
+        )
+        .catch(
+          (cleanupError) => {
+
+            console.error(
+              'Beneficiary Aadhaar cleanup failed:',
+              cleanupError
+            );
+
+          }
+        );
+    }
+
     return res.status(500).json({
       message:
         'Failed to create beneficiary.',
+
       error:
         error.message,
     });

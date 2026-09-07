@@ -41,6 +41,7 @@ const EMPTY = {
   username: "",
   email: "",
   initialPassword: "",
+  aadhaar:null,
 };
 
 function formatDate(value) {
@@ -245,6 +246,13 @@ export default function OwnerDashboard() {
 
       setError("");
       setSuccess("");
+      if (!form.aadhaar) {
+  setError(
+    "Please upload the Beneficiary's Aadhaar card."
+  );
+
+  return;
+}
 
       if (
         form.initialPassword
@@ -1434,6 +1442,128 @@ export default function OwnerDashboard() {
                     />
 
                   </div>
+
+                      <div>
+
+  <label
+    className="field-label"
+    htmlFor="b-aadhaar"
+  >
+    Beneficiary Aadhaar
+  </label>
+
+  <label
+    htmlFor="b-aadhaar"
+    className="
+      mt-1
+      flex
+      cursor-pointer
+      flex-col
+      items-center
+      justify-center
+      rounded-xl
+      border
+      border-dashed
+      border-ink-200
+      bg-ink-50/60
+      px-4
+      py-5
+      text-center
+      transition
+      hover:border-brand-300
+      hover:bg-brand-50/50
+    "
+  >
+
+    <UploadCloud
+      size={24}
+      className="
+        mb-2
+        text-brand-600
+      "
+    />
+
+    {form.aadhaar ? (
+
+      <>
+        <p className="
+          max-w-full
+          truncate
+          text-sm
+          font-semibold
+          text-ink-800
+        ">
+          {form.aadhaar.name}
+        </p>
+
+        <p className="
+          mt-1
+          text-xs
+          font-medium
+          text-green-600
+        ">
+          Aadhaar selected
+        </p>
+      </>
+
+    ) : (
+
+      <>
+        <p className="
+          text-sm
+          font-semibold
+          text-ink-700
+        ">
+          Upload Aadhaar Card
+        </p>
+
+        <p className="
+          mt-1
+          text-xs
+          text-ink-400
+        ">
+          JPG, PNG or PDF
+        </p>
+      </>
+
+    )}
+
+  </label>
+
+  <input
+    id="b-aadhaar"
+    type="file"
+    accept="image/jpeg,image/png,application/pdf"
+    className="hidden"
+    onChange={(e) => {
+
+      const file =
+        e.target.files?.[0] ||
+        null;
+
+      setForm(
+        (current) => ({
+          ...current,
+          aadhaar:
+            file,
+        })
+      );
+
+    }}
+    required
+  />
+
+  <p className="
+    mt-1.5
+    text-xs
+    leading-5
+    text-ink-400
+  ">
+    Upload the Beneficiary's Aadhaar
+    card for identity verification.
+  </p>
+
+</div>
 
 
                   <div>
