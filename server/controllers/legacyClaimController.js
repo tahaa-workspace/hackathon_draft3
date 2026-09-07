@@ -717,6 +717,173 @@ async function destroyUpload(uploaded) {
     .catch(() => {});
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| DELETE STORED LEGACY CLAIM FILE
+|--------------------------------------------------------------------------
+*/
+
+async function deleteStoredClaimFile(
+  file
+) {
+  if (!file) {
+    return;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE REAL ENCRYPTED FILE
+  |--------------------------------------------------------------------------
+  */
+
+  if (file.publicId) {
+
+    const result =
+      await cloudinary.uploader.destroy(
+        file.publicId,
+        {
+          resource_type:
+            file.resourceType ||
+            'raw',
+
+          type:
+            file.deliveryType ||
+            'authenticated',
+
+          invalidate:
+            true,
+        }
+      );
+
+    if (
+      result.result !== 'ok' &&
+      result.result !== 'not found'
+    ) {
+      throw new Error(
+        `Failed to delete encrypted claim file: ${file.originalName || file.publicId}`
+      );
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE PLACEHOLDER
+  |--------------------------------------------------------------------------
+  */
+
+  if (file.placeholderPublicId) {
+
+    const placeholderResult =
+      await cloudinary.uploader.destroy(
+        file.placeholderPublicId,
+        {
+          resource_type:
+            'image',
+
+          type:
+            'upload',
+
+          invalidate:
+            true,
+        }
+      );
+
+    if (
+      placeholderResult.result !== 'ok' &&
+      placeholderResult.result !==
+        'not found'
+    ) {
+      throw new Error(
+        `Failed to delete claim placeholder: ${file.placeholderPublicId}`
+      );
+    }
+  }
+}
+
+
+
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| DELETE ALL BENEFICIARY-UPLOADED CLAIM FILES
+|--------------------------------------------------------------------------
+*/
+
+async function deleteAllClaimFiles(
+  claim
+) {
+  const files = [];
+
+  /*
+  |--------------------------------------------------------------------------
+  | MAIN LEGACY CLAIM DOCUMENTS
+  |--------------------------------------------------------------------------
+  */
+
+  if (claim.deathCertificate) {
+    files.push(
+      claim.deathCertificate
+    );
+  }
+
+  if (claim.identityProof) {
+    files.push(
+      claim.identityProof
+    );
+  }
+
+  if (claim.supportingDocument) {
+    files.push(
+      claim.supportingDocument
+    );
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | ADDITIONAL DOCUMENTS SUBMITTED LATER
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    Array.isArray(
+      claim.informationRequests
+    )
+  ) {
+
+    for (
+      const request
+      of claim.informationRequests
+    ) {
+
+      if (
+        Array.isArray(
+          request.additionalDocuments
+        )
+      ) {
+
+        files.push(
+          ...request.additionalDocuments
+        );
+      }
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE FROM CLOUDINARY
+  |--------------------------------------------------------------------------
+  */
+
+  for (const file of files) {
+    await deleteStoredClaimFile(
+      file
+    );
+  }
+}
 /*
 |--------------------------------------------------------------------------
 | DELETE PLACEHOLDER
@@ -1293,10 +1460,62 @@ export async function adminReviewClaim(
     claim.status =
       'MORE_INFORMATION_REQUIRED';
   } else if (
-    action === 'REJECT'
-  ) {
-    claim.status =
-      'REJECTED_PLATFORM_CLAIM';
+  action === 'REJECT'
+) {
+
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE ALL BENEFICIARY LEGACY CLAIM FILES
+  |--------------------------------------------------------------------------
+  */
+
+  try {
+
+    await deleteAllClaimFiles(
+      claim
+    );
+
+  } catch (deleteError) {
+
+    console.error(
+      'Legacy Claim file deletion failed:',
+      deleteError
+    );
+
+    return res
+      .status(500)
+      .json({
+        message:
+          'Legacy Claim could not be rejected because its uploaded documents could not be deleted safely.',
+
+        error:
+          deleteError.message,
+      });
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE CLAIM METADATA FROM MONGODB
+  |--------------------------------------------------------------------------
+  */
+
+  await LegacyClaim.deleteOne({
+    _id:
+      claim._id,
+  });
+
+  return res
+    .status(200)
+    .json({
+      message:
+        'Legacy Access Claim rejected. All beneficiary-uploaded claim documents and metadata have been permanently deleted.',
+
+      deleted:
+        true,
+
+      claimId:
+        claim._id.toString(),
+    });
   } else if (
     action === 'HOLD'
   ) {

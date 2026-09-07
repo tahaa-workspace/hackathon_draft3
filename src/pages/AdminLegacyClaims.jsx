@@ -95,16 +95,62 @@ export default function AdminLegacyClaims() {
     finally { setWorkingId(null); }
   };
 
-  const reject = async (claim) => {
-    const remarks = window.prompt('State the platform reason for rejection.', '') ?? null;
-    if (remarks === null) return;
-    if (!remarks.trim()) { setError('A rejection reason is required.'); return; }
-    if (!window.confirm('Reject this Legacy Access Claim?')) return;
-    setWorkingId(claim.id);
-    try { await rejectClaim(claim.id, remarks.trim()); await load(); }
-    catch (err) { setError(err.message); }
-    finally { setWorkingId(null); }
-  };
+const reject = async (claim) => {
+  const remarks =
+    window.prompt(
+      'State the platform reason for rejection.',
+      ''
+    ) ?? null;
+
+  if (remarks === null) {
+    return;
+  }
+
+  if (!remarks.trim()) {
+    setError(
+      'A rejection reason is required.'
+    );
+    return;
+  }
+
+  const confirmed =
+    window.confirm(
+      'Reject this Legacy Access Claim?\n\nAll Beneficiary-uploaded Legacy Claim documents will be permanently deleted from Cloudinary and the claim metadata will be removed from MongoDB.'
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  setWorkingId(claim.id);
+  setError('');
+
+  try {
+    const result =
+      await rejectClaim(
+        claim.id,
+        remarks.trim()
+      );
+
+    if (result?.deleted) {
+      setClaims((current) =>
+        current.filter(
+          (item) =>
+            item.id !== claim.id
+        )
+      );
+    } else {
+      await load();
+    }
+  } catch (err) {
+    setError(
+      err.message ||
+        'Unable to reject Legacy Access Claim.'
+    );
+  } finally {
+    setWorkingId(null);
+  }
+};
 
   const forward = async (claim) => {
     const remarks = window.prompt('Platform review remarks.', 'Platform checks completed.') ?? null;

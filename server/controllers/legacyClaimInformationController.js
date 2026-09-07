@@ -277,42 +277,262 @@ export async function submitAdditionalInformation(req, res) {
   }
 }
 
-export async function rejectLegacyClaim(req, res) {
+async function deleteClaimStoredFile(file) {
+  if (!file) return;
+
+  // Delete encrypted original
+  if (file.publicId) {
+    const result =
+      await cloudinary.uploader.destroy(
+        file.publicId,
+        {
+          resource_type:
+            file.resourceType || 'raw',
+
+          type:
+            file.deliveryType ||
+            'authenticated',
+
+          invalidate: true,
+        }
+      );
+
+    console.log(
+      'Encrypted file delete:',
+      file.publicId,
+      result
+    );
+  }
+
+  // Delete placeholder image
+  if (file.placeholderPublicId) {
+    const placeholderResult =
+      await cloudinary.uploader.destroy(
+        file.placeholderPublicId,
+        {
+          resource_type: 'image',
+          type: 'upload',
+          invalidate: true,
+        }
+      );
+
+    console.log(
+      'Placeholder delete:',
+      file.placeholderPublicId,
+      placeholderResult
+    );
+  }
+}
+
+async function deleteAllLegacyClaimFiles(
+  claim
+) {
+  const files = [];
+
+  if (claim.deathCertificate) {
+    files.push(
+      claim.deathCertificate
+    );
+  }
+
+  if (claim.identityProof) {
+    files.push(
+      claim.identityProof
+    );
+  }
+
+  if (claim.supportingDocument) {
+    files.push(
+      claim.supportingDocument
+    );
+  }
+
+  for (
+    const informationRequest
+    of claim.informationRequests || []
+  ) {
+    for (
+      const additionalFile
+      of informationRequest.additionalDocuments ||
+      []
+    ) {
+      files.push(
+        additionalFile
+      );
+    }
+  }
+
+  for (const file of files) {
+    await deleteClaimStoredFile(
+      file
+    );
+  }
+}
+
+export async function rejectLegacyClaim(
+  req,
+  res
+) {
   try {
-    const remarks = String(req.body?.remarks || '').trim();
-    if (!remarks) return res.status(400).json({ message: 'A rejection reason is required.' });
+    const remarks =
+      String(
+        req.body?.remarks || ''
+      ).trim();
 
-    const claim = await LegacyClaim.findById(req.params.id);
-    if (!claim) return res.status(404).json({ message: 'Legacy Access Claim not found.' });
-
-    if (req.user.role === 'ADMIN') {
-      if (claim.status !== 'UNDER_ADMIN_REVIEW') {
-        return res.status(400).json({ message: 'Admin can reject only while the claim is under Admin review.' });
-      }
-      claim.adminReview.reviewedBy = req.user.id;
-      claim.adminReview.reviewedAt = new Date();
-      claim.adminReview.remarks = remarks;
-    } else if (req.user.role === 'LAWYER') {
-      if (!isAssignedLawyer(claim, req.user.id)) {
-        return res.status(403).json({ message: 'This claim is not assigned to you.' });
-      }
-      if (claim.status !== 'UNDER_LAWYER_REVIEW') {
-        return res.status(400).json({ message: 'Lawyer can reject only while the claim is under Lawyer review.' });
-      }
-      claim.lawyerReview.reviewedBy = req.user.id;
-      claim.lawyerReview.reviewedAt = new Date();
-      claim.lawyerReview.remarks = remarks;
-      claim.lawyerReview.action = 'REJECT';
-    } else {
-      return res.status(403).json({ message: 'Only Admin or the assigned Lawyer can reject a claim.' });
+    if (!remarks) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'A rejection reason is required.',
+        });
     }
 
-    claim.status = 'REJECTED_PLATFORM_CLAIM';
-    await claim.save();
-    return res.json({ message: 'Legacy Access Claim rejected.', status: claim.status });
+    const claim =
+      await LegacyClaim.findById(
+        req.params.id
+      );
+
+    if (!claim) {
+      return res
+        .status(404)
+        .json({
+          message:
+            'Legacy Access Claim not found.',
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK WHO IS REJECTING
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      req.user.role === 'ADMIN'
+    ) {
+      if (
+        claim.status !==
+        'UNDER_ADMIN_REVIEW'
+      ) {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Admin can reject only while the claim is under Admin review.',
+          });
+      }
+
+    } else if (
+      req.user.role === 'LAWYER'
+    ) {
+      if (
+        !isAssignedLawyer(
+          claim,
+          req.user.id
+        )
+      ) {
+        return res
+          .status(403)
+          .json({
+            message:
+              'This claim is not assigned to you.',
+          });
+      }
+
+      if (
+        claim.status !==
+        'UNDER_LAWYER_REVIEW'
+      ) {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Lawyer can reject only while the claim is under Lawyer review.',
+          });
+      }
+
+    } else {
+      return res
+        .status(403)
+        .json({
+          message:
+            'Only Admin or the assigned Lawyer can reject a claim.',
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE CLOUDINARY FILES
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+      await deleteAllLegacyClaimFiles(
+        claim
+      );
+    } catch (deleteError) {
+      console.error(
+        'Legacy Claim Cloudinary deletion failed:',
+        deleteError
+      );
+
+      return res
+        .status(500)
+        .json({
+          message:
+            'Claim rejection stopped because uploaded documents could not be deleted from Cloudinary.',
+
+          error:
+            deleteError.message,
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE CLAIM METADATA FROM MONGODB
+    |--------------------------------------------------------------------------
+    */
+
+    const claimId =
+      claim._id.toString();
+
+    await LegacyClaim.deleteOne({
+      _id: claim._id,
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | SUCCESS
+    |--------------------------------------------------------------------------
+    */
+
+    return res
+      .status(200)
+      .json({
+        message:
+          'Legacy Access Claim rejected. All beneficiary-uploaded documents and claim metadata were permanently deleted.',
+
+        deleted: true,
+
+        claimId,
+      });
+
   } catch (error) {
-    console.error('Reject legacy claim error:', error);
-    return res.status(500).json({ message: 'Unable to reject this Legacy Access Claim.' });
+    console.error(
+      'Reject legacy claim error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        message:
+          'Unable to reject this Legacy Access Claim.',
+
+        error:
+          error.message,
+      });
   }
 }
 
