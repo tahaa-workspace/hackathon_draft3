@@ -13,6 +13,13 @@ import {
   lawyerReviewClaim,
   getClaimFileUrl,
 } from '../controllers/legacyClaimController.js';
+import {
+  getClaimInformationRequests,
+  requestMoreInformation,
+  submitAdditionalInformation,
+  rejectLegacyClaim,
+  getAdditionalEvidenceFile,
+} from '../controllers/legacyClaimInformationController.js';
 
 const router = Router();
 
@@ -35,6 +42,24 @@ router.put('/admin/:id/review', protect, authorize('ADMIN'), adminReviewClaim);
 router.put('/admin/:id/assign-lawyer', protect, authorize('ADMIN'), assignClaimLawyer);
 router.get('/lawyer', protect, authorize('LAWYER'), listLawyerClaims);
 router.put('/lawyer/:id/review', protect, authorize('LAWYER'), lawyerReviewClaim);
+
+router.get('/:id/information-requests', protect, authorize('ADMIN', 'BENEFICIARY', 'LAWYER'), getClaimInformationRequests);
+router.put('/:id/request-more-information', protect, authorize('ADMIN', 'LAWYER'), requestMoreInformation);
+router.put('/:id/reject', protect, authorize('ADMIN', 'LAWYER'), rejectLegacyClaim);
+router.post(
+  '/:id/additional-information',
+  protect,
+  authorize('BENEFICIARY'),
+  upload.array('additionalDocuments', 5),
+  submitAdditionalInformation
+);
+router.get(
+  '/:id/additional-files/:requestId/:fileIndex',
+  protect,
+  authorize('ADMIN', 'BENEFICIARY', 'LAWYER'),
+  getAdditionalEvidenceFile
+);
+
 router.get('/:id/files/:kind', protect, authorize('ADMIN', 'BENEFICIARY', 'LAWYER'), getClaimFileUrl);
 
 export default router;
