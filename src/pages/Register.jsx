@@ -1,19 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Loader2, CheckCircle2, Upload, FileText } from 'lucide-react';
-import { registerUser } from '../services/authService';
+import { UserPlus, Loader2, CheckCircle2, Upload, FileText, Smartphone } from 'lucide-react';
+import {
+  registerUser,
+  sendRegistrationOTP,
+  verifyRegistrationOTP,
+} from '../services/authService';
 import AuthShell from "../components/auth/AuthShell";
 
 const INITIAL = {
   name: '',
   username: '',
   email: '',
+  phone: '',
   password: '',
   confirmPassword: '',
 };
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+const RESEND_SECONDS = 60;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -23,7 +29,93 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState('');
+  const [verifiedPhone, setVerifiedPhone] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+  const [otpMessage, setOtpMessage] = useState('');
+
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+
+    const timer = window.setInterval(() => {
+      setResendIn((value) => Math.max(0, value - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendIn]);
+
+  const update = (key) => (e) => {
+    const value = e.target.value;
+
+    setForm((f) => ({ ...f, [key]: value }));
+
+    if (key === 'phone' && value !== verifiedPhone) {
+      setPhoneVerified(false);
+      setPhoneVerificationToken('');
+      setOtp('');
+      setOtpSent(false);
+      setOtpMessage('');
+      setResendIn(0);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    setError('');
+    setOtpMessage('');
+
+    if (!form.phone.trim()) {
+      setError('Please enter your mobile number first.');
+      return;
+    }
+
+    setOtpLoading(true);
+
+    try {
+      const result = await sendRegistrationOTP(form.phone.trim());
+      setOtpSent(true);
+      setOtp('');
+      setPhoneVerified(false);
+      setPhoneVerificationToken('');
+      setVerifiedPhone('');
+      setResendIn(RESEND_SECONDS);
+      setOtpMessage(result.message || 'OTP sent successfully.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setError('');
+    setOtpMessage('');
+
+    if (!otp.trim()) {
+      setError('Please enter the OTP sent to your mobile number.');
+      return;
+    }
+
+    setVerifyLoading(true);
+
+    try {
+      const result = await verifyRegistrationOTP(form.phone.trim(), otp.trim());
+      setPhoneVerified(true);
+      setPhoneVerificationToken(result.verificationToken);
+      setVerifiedPhone(form.phone);
+      setOtpMessage(result.message || 'Mobile number verified successfully.');
+    } catch (err) {
+      setPhoneVerified(false);
+      setPhoneVerificationToken('');
+      setError(err.message);
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
 
   const handleFile = (e) => {
     const file = e.target.files?.[0] || null;
@@ -55,6 +147,10 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
+    if (!phoneVerified || !phoneVerificationToken) {
+      setError('Please verify your mobile number before submitting registration.');
+      return;
+    }
     if (form.password !== form.confirmPassword) {
       setError('Password and confirm password do not match.');
       return;
@@ -70,7 +166,11 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await registerUser({ ...form, aadhaar });
+      await registerUser({
+        ...form,
+        phoneVerificationToken,
+        aadhaar,
+      });
       setDone(true);
     } catch (err) {
       setError(err.message);
@@ -86,8 +186,8 @@ export default function Register() {
           <div className="alert-success flex items-start gap-3">
             <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
             <span>
-              Your registration and Aadhaar document have been received. An administrator will
-              review your identity document and approve or reject your owner account.
+              Your mobile number has been verified and your registration and Aadhaar document have been received.
+              An administrator will review your identity document and approve or reject your owner account.
             </span>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -106,7 +206,7 @@ export default function Register() {
   return (
     <AuthShell
       title="Create an owner account"
-      subtitle="Owner registrations require Aadhaar verification by an administrator"
+      subtitle="Verify your mobile number, then submit Aadhaar for administrator approval"
       footer={
         <p className="text-sm text-ink-500">
           Already approved?{' '}
@@ -147,6 +247,77 @@ export default function Register() {
             autoComplete="email"
             required
           />
+        </div>
+
+        <div className="rounded-xl border border-ink-200 bg-ink-50/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Smartphone size={17} className="text-brand-700" />
+            <p className="text-sm font-semibold text-ink-800">Mobile verification</p>
+          </div>
+
+          <label className="field-label" htmlFor="phone">Mobile number</label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="phone"
+              type="tel"
+              inputMode="tel"
+              className="field-input flex-1"
+              value={form.phone}
+              onChange={update('phone')}
+              placeholder="9876543210"
+              autoComplete="tel"
+              disabled={phoneVerified}
+              required
+            />
+            <button
+              type="button"
+              className="btn-secondary whitespace-nowrap"
+              onClick={handleSendOtp}
+              disabled={otpLoading || phoneVerified || (otpSent && resendIn > 0)}
+            >
+              {otpLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+              {otpSent ? (resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend OTP') : 'Send OTP'}
+            </button>
+          </div>
+
+          {otpSent && !phoneVerified && (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                id="registration-otp"
+                type="text"
+                inputMode="numeric"
+                className="field-input flex-1"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="Enter OTP"
+                autoComplete="one-time-code"
+              />
+              <button
+                type="button"
+                className="btn-primary whitespace-nowrap"
+                onClick={handleVerifyOtp}
+                disabled={verifyLoading || !otp}
+              >
+                {verifyLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                Verify OTP
+              </button>
+            </div>
+          )}
+
+          {phoneVerified && (
+            <div className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700">
+              <CheckCircle2 size={17} />
+              Mobile number verified
+            </div>
+          )}
+
+          {otpMessage && (
+            <p className="mt-2 text-xs text-ink-600">{otpMessage}</p>
+          )}
+
+          <p className="mt-2 text-xs text-ink-500">
+            Indian 10-digit mobile numbers are automatically sent using the +91 country code.
+          </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -205,7 +376,7 @@ export default function Register() {
           </p>
         </div>
 
-        <button type="submit" className="btn-primary w-full" disabled={loading}>
+        <button type="submit" className="btn-primary w-full" disabled={loading || !phoneVerified}>
           {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
           {loading ? 'Submitting…' : 'Submit registration request'}
         </button>
