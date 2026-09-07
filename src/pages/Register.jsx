@@ -20,6 +20,13 @@ const INITIAL = {
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 const RESEND_SECONDS = 60;
+const DEMO_MOBILES = [
+  '9054559272',
+  '6352522036',
+  '8238387089',
+  '9106882453',
+  '9316744194',
+];
 
 export default function Register() {
   const navigate = useNavigate();
@@ -316,7 +323,7 @@ export default function Register() {
           )}
 
           <p className="mt-2 text-xs text-ink-500">
-            Demo mode: use mobile number 9054559272. The generated OTP is shown only in the backend terminal and expires in 5 minutes.
+            Demo mode: use one of these test numbers: {DEMO_MOBILES.join(', ')}. The generated OTP is shown only in the backend terminal and expires in 5 minutes.
           </p>
         </div>
 
