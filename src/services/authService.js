@@ -1,11 +1,5 @@
 const API_BASE = '/api';
 
-/*
- * Return the authentication header for protected API calls.
- *
- * sessionStorage is used instead of localStorage so that
- * the login does not survive after the browser/tab session ends.
- */
 function authHeaders() {
   const token = sessionStorage.getItem('dl_token');
 
@@ -14,10 +8,6 @@ function authHeaders() {
     : {};
 }
 
-
-/*
- * Common API request helper.
- */
 async function request(
   path,
   {
@@ -30,11 +20,6 @@ async function request(
     ...authHeaders(),
   };
 
-  /*
-   * Do not manually set Content-Type for FormData.
-   * The browser will automatically add the correct
-   * multipart/form-data boundary.
-   */
   if (!isForm) {
     headers['Content-Type'] = 'application/json';
   }
@@ -86,10 +71,25 @@ export async function verifyRegistrationOTP(phone, otp) {
   });
 }
 
+export async function sendRegistrationEmailOTP(email) {
+  return request('/auth/registration/email/send-otp', {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+export async function verifyRegistrationEmailOTP(email, otp) {
+  return request('/auth/registration/email/verify-otp', {
+    method: 'POST',
+    body: { email, otp },
+  });
+}
+
 export async function registerUser({
   name,
   username,
   email,
+  emailVerificationToken,
   phone,
   phoneVerificationToken,
   password,
@@ -101,6 +101,7 @@ export async function registerUser({
   formData.append('name', name);
   formData.append('username', username);
   formData.append('email', email);
+  formData.append('emailVerificationToken', emailVerificationToken);
   formData.append('phone', phone);
   formData.append('phoneVerificationToken', phoneVerificationToken);
   formData.append('password', password);
@@ -178,8 +179,6 @@ export async function loginUser({
 }
 
 
-
-
 /* =========================================================
    ADMIN
    ========================================================= */
@@ -189,12 +188,10 @@ export async function getPendingRegistrations() {
   return data.registrations || [];
 }
 
-
 export async function getAllUsers() {
   const data = await request('/admin/users');
   return data.users || [];
 }
-
 
 export async function updateUserStatus(id, status) {
   return request(
@@ -205,7 +202,6 @@ export async function updateUserStatus(id, status) {
     }
   );
 }
-
 
 export async function getAadhaarReviewUrl(id) {
   return request(
@@ -219,7 +215,6 @@ export async function getLawyerCredentialReviewUrl(id) {
   );
 }
 
-
 export async function approveUser(id) {
   return request(
     `/admin/users/${id}/approve`,
@@ -228,7 +223,6 @@ export async function approveUser(id) {
     }
   );
 }
-
 
 export async function rejectUser(
   id,
@@ -257,50 +251,23 @@ export async function createBeneficiary({
   initialPassword,
   aadhaar,
 }) {
+  const formData = new FormData();
 
-  const formData =
-    new FormData();
-
-  formData.append(
-    'name',
-    name
-  );
-
-  formData.append(
-    'username',
-    username
-  );
-
-  formData.append(
-    'email',
-    email
-  );
-
-  formData.append(
-    'initialPassword',
-    initialPassword
-  );
-
-  formData.append(
-    'aadhaar',
-    aadhaar
-  );
+  formData.append('name', name);
+  formData.append('username', username);
+  formData.append('email', email);
+  formData.append('initialPassword', initialPassword);
+  formData.append('aadhaar', aadhaar);
 
   return request(
     '/beneficiaries',
     {
-      method:
-        'POST',
-
-      body:
-        formData,
-
-      isForm:
-        true,
+      method: 'POST',
+      body: formData,
+      isForm: true,
     }
   );
 }
-
 
 export async function listBeneficiaries() {
   return request('/beneficiaries');
@@ -311,27 +278,13 @@ export async function listBeneficiaries() {
    SESSION MANAGEMENT
    ========================================================= */
 
-/*
- * Save authentication only for the current browser session.
- *
- * IMPORTANT:
- * Previously this used localStorage. localStorage survives
- * browser restarts, which caused the previous Admin account
- * to automatically appear logged in when the app was reopened.
- */
 export function persistSession(
   token,
   user
 ) {
-  /*
-   * Remove data created by the old version of the app.
-   */
   localStorage.removeItem('dl_token');
   localStorage.removeItem('dl_user');
 
-  /*
-   * Save only for the current browser session.
-   */
   sessionStorage.setItem(
     'dl_token',
     token
@@ -343,35 +296,14 @@ export function persistSession(
   );
 }
 
-
-/*
- * Logout completely.
- */
 export function clearSession() {
-  /*
-   * Current session data.
-   */
   sessionStorage.removeItem('dl_token');
   sessionStorage.removeItem('dl_user');
-
-  /*
-   * Also remove any old persistent data
-   * left by earlier versions of the application.
-   */
   localStorage.removeItem('dl_token');
   localStorage.removeItem('dl_user');
 }
 
-
-/*
- * Restore a login only if the current browser session
- * still has valid session data.
- */
 export function loadStoredSession() {
-  /*
-   * Always remove the old persistent localStorage
-   * login information.
-   */
   localStorage.removeItem('dl_token');
   localStorage.removeItem('dl_user');
 
@@ -393,29 +325,15 @@ export function loadStoredSession() {
       user,
     };
   } catch {
-    /*
-     * If stored user data is damaged,
-     * clean everything instead of crashing.
-     */
     clearSession();
-
     return null;
   }
 }
 
 
-
 /* =========================================================
    PASSWORD CHANGE
    ========================================================= */
-
-/*
- * Send initial OTP or resend OTP.
- *
- * Authentication comes from authHeaders(),
- * therefore the frontend does not need to send
- * the registered email or token manually.
- */
 
 export async function requestPasswordChangeOTP() {
     return request(
@@ -425,11 +343,6 @@ export async function requestPasswordChangeOTP() {
         }
     );
 }
-
-
-/*
- * Verify the 6-digit OTP.
- */
 
 export async function verifyPasswordChangeOTP(
     otp
@@ -445,11 +358,6 @@ export async function verifyPasswordChangeOTP(
         }
     );
 }
-
-
-/*
- * Complete password change after OTP verification.
- */
 
 export async function completePasswordChange({
     currentPassword,
