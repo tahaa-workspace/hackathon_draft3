@@ -26,6 +26,11 @@ import {
 import protect from "../middleware/authMiddleware.js";
 import upload from "../middleware/uploadMiddleware.js";
 
+import {
+    requireExactRegistrationMobile,
+    requireStrongRegistrationPassword,
+} from "../middleware/registrationValidationMiddleware.js";
+
 const router = Router();
 
 /*
@@ -36,11 +41,13 @@ REGISTRATION
 
 router.post(
     "/registration/send-otp",
+    requireExactRegistrationMobile,
     requestRegistrationOTP
 );
 
 router.post(
     "/registration/verify-otp",
+    requireExactRegistrationMobile,
     verifyRegistrationOTP
 );
 
@@ -57,6 +64,8 @@ router.post(
 router.post(
     "/register",
     upload.single("aadhaar"),
+    requireExactRegistrationMobile,
+    requireStrongRegistrationPassword,
     registerOwner
 );
 
@@ -110,23 +119,11 @@ router.post(
     requestPasswordChangeOTP
 );
 
-/*
-=========================================================
-PASSWORD CHANGE - VERIFY OTP
-=========================================================
-*/
-
 router.post(
     "/change-password/verify-otp",
     protect,
     verifyPasswordChangeOTP
 );
-
-/*
-=========================================================
-PASSWORD CHANGE - COMPLETE
-=========================================================
-*/
 
 router.post(
     "/change-password/complete",
