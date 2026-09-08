@@ -1,0 +1,18 @@
+import { Router } from 'express';
+
+import protect from '../middleware/authMiddleware.js';
+import {
+  requestEmailChangeOTP,
+  verifyEmailChangeOTP,
+  requestPhoneChangeOTP,
+  verifyPhoneChangeOTP,
+} from '../controllers/profileController.js';
+
+const router = Router();
+
+router.post('/contact/email/request-otp', protect, requestEmailChangeOTP);
+router.post('/contact/email/verify', protect, verifyEmailChangeOTP);
+router.post('/contact/phone/request-otp', protect, requestPhoneChangeOTP);
+router.post('/contact/phone/verify', protect, verifyPhoneChangeOTP);
+
+export default router;
