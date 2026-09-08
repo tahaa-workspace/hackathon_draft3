@@ -21,29 +21,43 @@ function collectClaimFiles(claim) {
 async function destroyCloudinaryFile(file) {
   if (!file) return;
 
-  const ids = [file.publicId, file.placeholderPublicId].filter(Boolean);
-
-  for (const publicId of ids) {
+  if (file.publicId) {
     try {
-      await cloudinary.uploader.destroy(publicId, {
+      await cloudinary.uploader.destroy(file.publicId, {
         resource_type: file.resourceType || 'raw',
         type: file.deliveryType || 'authenticated',
         invalidate: true,
       });
     } catch (error) {
       console.warn(
-        `Unable to remove orphan legacy-claim Cloudinary file ${publicId}:`,
+        `Unable to remove orphan legacy-claim encrypted file ${file.publicId}:`,
+        error?.message || error
+      );
+    }
+  }
+
+  // Claim placeholders are uploaded separately as normal Cloudinary images.
+  if (file.placeholderPublicId) {
+    try {
+      await cloudinary.uploader.destroy(file.placeholderPublicId, {
+        resource_type: 'image',
+        type: 'upload',
+        invalidate: true,
+      });
+    } catch (error) {
+      console.warn(
+        `Unable to remove orphan legacy-claim placeholder ${file.placeholderPublicId}:`,
         error?.message || error
       );
     }
   }
 }
 
-export async function cleanupOrphanLegacyClaims(req, _res, next) {
+export async function cleanupOrphanLegacyClaims(_req, _res, next) {
   try {
     const claims = await LegacyClaim.find({})
       .select(
-        'ownerId beneficiaryId assignedLawyerId deathCertificate identityProof supportingDocument informationRequests'
+        'ownerId beneficiaryId deathCertificate identityProof supportingDocument informationRequests'
       )
       .lean();
 
@@ -51,10 +65,12 @@ export async function cleanupOrphanLegacyClaims(req, _res, next) {
 
     const requiredUserIds = [
       ...new Set(
-        claims.flatMap((claim) => [
-          claim.ownerId?.toString(),
-          claim.beneficiaryId?.toString(),
-        ]).filter(Boolean)
+        claims
+          .flatMap((claim) => [
+            claim.ownerId?.toString(),
+            claim.beneficiaryId?.toString(),
+          ])
+          .filter(Boolean)
       ),
     ];
 
@@ -74,70 +90,25 @@ export async function cleanupOrphanLegacyClaims(req, _res, next) {
       return !ownerExists || !beneficiaryExists;
     });
 
-    if (orphanClaims.length) {
-      for (const claim of orphanClaims) {
-        const files = collectClaimFiles(claim);
-        await Promise.all(files.map((file) => destroyCloudinaryFile(file)));
-      }
+    if (!orphanClaims.length) return next();
 
-      await LegacyClaim.deleteMany({
-        _id: { $in: orphanClaims.map((claim) => claim._id) },
-      });
-
-      console.log(
-        `Removed ${orphanClaims.length} orphan legacy claim${orphanClaims.length === 1 ? '' : 's'} before Admin listing.`
-      );
+    // Remove evidence first, then remove the orphan database records. A Cloudinary
+    // cleanup failure is logged but does not keep an invalid claim in the Admin list.
+    for (const claim of orphanClaims) {
+      const files = collectClaimFiles(claim);
+      await Promise.all(files.map((file) => destroyCloudinaryFile(file)));
     }
 
-    // A deleted Lawyer must not make an otherwise valid Owner/Beneficiary claim disappear.
-    // Clear only the stale Lawyer reference so the claim can be assigned again.
-    const assignedLawyerIds = [
-      ...new Set(
-        claims
-          .filter(
-            (claim) =>
-              claim.assignedLawyerId &&
-              !orphanClaims.some((orphan) => orphan._id.toString() === claim._id.toString())
-          )
-          .map((claim) => claim.assignedLawyerId.toString())
-      ),
-    ];
+    await LegacyClaim.deleteMany({
+      _id: { $in: orphanClaims.map((claim) => claim._id) },
+    });
 
-    if (assignedLawyerIds.length) {
-      const existingLawyers = await User.find({
-        _id: { $in: assignedLawyerIds },
-        role: 'LAWYER',
-      })
-        .select('_id')
-        .lean();
-
-      const lawyerIds = new Set(existingLawyers.map((lawyer) => lawyer._id.toString()));
-      const staleLawyerClaimIds = claims
-        .filter(
-          (claim) =>
-            claim.assignedLawyerId &&
-            !lawyerIds.has(claim.assignedLawyerId.toString()) &&
-            !orphanClaims.some((orphan) => orphan._id.toString() === claim._id.toString())
-        )
-        .map((claim) => claim._id);
-
-      if (staleLawyerClaimIds.length) {
-        await LegacyClaim.updateMany(
-          { _id: { $in: staleLawyerClaimIds } },
-          {
-            $set: {
-              assignedLawyerId: null,
-              'lawyerReview.reviewedBy': null,
-              'lawyerReview.reviewedAt': null,
-              'lawyerReview.action': null,
-            },
-          }
-        );
-      }
-    }
+    console.log(
+      `Removed ${orphanClaims.length} orphan legacy claim${orphanClaims.length === 1 ? '' : 's'} before Admin listing.`
+    );
   } catch (error) {
-    // Cleanup should never make the Admin page unavailable. The list controller
-    // still runs and the error is logged so it can be investigated separately.
+    // Cleanup must not make the Admin page unavailable if a separate cleanup
+    // operation fails. The existing list controller is still allowed to run.
     console.error('Legacy claim orphan cleanup error:', error);
   }
 
