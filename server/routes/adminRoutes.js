@@ -13,6 +13,7 @@ import {
 } from '../controllers/lawyerCredentialReviewController.js';
 import protect from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
+import cleanupOwnerAadhaarPlaceholderOnReject from '../middleware/aadhaarPlaceholderCleanupMiddleware.js';
 
 const router = Router();
 
@@ -32,6 +33,12 @@ router.get(
 router.get('/lawyer-credential-view/:id', viewLawyerCredential);
 
 router.put('/users/:id/approve', protect, authorize('ADMIN'), approveUser);
-router.put('/users/:id/reject', protect, authorize('ADMIN'), rejectUser);
+router.put(
+  '/users/:id/reject',
+  protect,
+  authorize('ADMIN'),
+  cleanupOwnerAadhaarPlaceholderOnReject,
+  rejectUser
+);
 
 export default router;
