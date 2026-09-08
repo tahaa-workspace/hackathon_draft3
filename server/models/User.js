@@ -7,6 +7,7 @@ const ALLOWED_STATUSES = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED'];
 
 const encryptedDocumentSchema = {
   publicId: { type: String, default: null },
+  placeholderPublicId: { type: String, default: null },
   resourceType: { type: String, default: 'raw' },
   deliveryType: { type: String, default: 'authenticated' },
   originalName: { type: String, default: null },
@@ -79,10 +80,12 @@ userSchema.set('toJSON', {
 
     if (ret.aadhaarDocument) {
       delete ret.aadhaarDocument.publicId;
+      delete ret.aadhaarDocument.placeholderPublicId;
     }
 
     if (ret.lawyerProfile?.credentialDocument) {
       delete ret.lawyerProfile.credentialDocument.publicId;
+      delete ret.lawyerProfile.credentialDocument.placeholderPublicId;
     }
 
     return ret;
