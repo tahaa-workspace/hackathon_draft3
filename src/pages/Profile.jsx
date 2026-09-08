@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   AtSign,
   BadgeCheck,
@@ -18,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import { getCurrentProfile } from '../services/authService';
 
 import ProfileHero from '../components/profile/ProfileHero';
 import ProfileInfoCard from '../components/profile/ProfileInfoCard';
@@ -58,8 +60,24 @@ const DEFAULT_ROLE_META = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateCurrentUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+
+    getCurrentProfile()
+      .then((freshUser) => {
+        if (active && freshUser) updateCurrentUser(freshUser);
+      })
+      .catch((error) => {
+        console.error('Unable to refresh profile details:', error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [updateCurrentUser]);
 
   if (!user) return null;
 
