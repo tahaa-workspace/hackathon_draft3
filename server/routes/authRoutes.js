@@ -1,12 +1,13 @@
 import { Router } from "express";
 
 import {
-    registerLawyer,
     login,
     requestPasswordChangeOTP,
     verifyPasswordChangeOTP,
     completePasswordChange,
 } from "../controllers/authController.js";
+
+import { registerLawyer } from "../controllers/lawyerRegistrationController.js";
 
 import {
     registerOwner,
@@ -65,7 +66,6 @@ router.post(
     registerLawyer
 );
 
-
 /*
 =========================================================
 LOGIN
@@ -76,7 +76,6 @@ router.post(
     "/login",
     login
 );
-
 
 /*
 =========================================================
@@ -99,7 +98,6 @@ router.post(
     completeForgotPasswordReset
 );
 
-
 /*
 =========================================================
 PASSWORD CHANGE - SEND / RESEND OTP
@@ -111,7 +109,6 @@ router.post(
     protect,
     requestPasswordChangeOTP
 );
-
 
 /*
 =========================================================
@@ -125,7 +122,6 @@ router.post(
     verifyPasswordChangeOTP
 );
 
-
 /*
 =========================================================
 PASSWORD CHANGE - COMPLETE
@@ -137,6 +133,5 @@ router.post(
     protect,
     completePasswordChange
 );
-
 
 export default router;
