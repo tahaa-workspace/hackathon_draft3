@@ -1,8 +1,8 @@
 import {
   AtSign,
   BadgeCheck,
-  CalendarDays,
   FileCheck2,
+  Gavel,
   KeyRound,
   LockKeyhole,
   Mail,
@@ -35,11 +35,23 @@ const ROLE_META = {
     Icon: Users,
   },
 
+  LAWYER: {
+    label: 'Lawyer',
+    description: 'Approved legal advisor account',
+    Icon: Gavel,
+  },
+
   ADMIN: {
     label: 'Administrator',
     description: 'Platform administrator',
     Icon: Shield,
   },
+};
+
+const DEFAULT_ROLE_META = {
+  label: 'User',
+  description: 'Platform account',
+  Icon: User,
 };
 
 export default function Profile() {
@@ -48,18 +60,16 @@ export default function Profile() {
 
   if (!user) return null;
 
-  const role = ROLE_META[user.role] || ROLE_META.BENEFICIARY;
+  const role = ROLE_META[user.role] || DEFAULT_ROLE_META;
   const isAdmin = user.role === 'ADMIN';
+  const isLawyer = user.role === 'LAWYER';
 
   return (
     <div className="profile-page">
       <Navbar />
 
       <main className="profile-container">
-        <ProfileHero
-          user={user}
-          role={role}
-        />
+        <ProfileHero user={user} role={role} />
 
         <div className="profile-layout">
           <section className="profile-main-column">
@@ -69,29 +79,10 @@ export default function Profile() {
               description="Basic information associated with your Digital Legacy account."
             >
               <div className="profile-information-grid">
-                <ProfileField
-                  icon={User}
-                  label="Full name"
-                  value={user.name}
-                />
-
-                <ProfileField
-                  icon={AtSign}
-                  label="Username"
-                  value={user.username}
-                />
-
-                <ProfileField
-                  icon={Mail}
-                  label="Email address"
-                  value={user.email}
-                />
-
-                <ProfileField
-                  icon={BadgeCheck}
-                  label="Account role"
-                  value={role.label}
-                />
+                <ProfileField icon={User} label="Full name" value={user.name} />
+                <ProfileField icon={AtSign} label="Username" value={user.username} />
+                <ProfileField icon={Mail} label="Email address" value={user.email} />
+                <ProfileField icon={BadgeCheck} label="Account role" value={role.label} />
               </div>
             </ProfileInfoCard>
 
@@ -102,22 +93,46 @@ export default function Profile() {
                 description="This account is responsible for user governance and identity-review operations."
               >
                 <div className="grid gap-3 md:grid-cols-3">
-                  <AdminPrivilege
+                  <Privilege
                     icon={UserCog}
                     title="Account control"
                     description="Search, activate, and suspend Owner and Beneficiary accounts."
                   />
-
-                  <AdminPrivilege
+                  <Privilege
                     icon={FileCheck2}
                     title="Identity review"
                     description="Review Owner Aadhaar submissions before approving registrations."
                   />
-
-                  <AdminPrivilege
+                  <Privilege
                     icon={LockKeyhole}
                     title="Privacy boundary"
                     description="Administrative access does not grant access to private Owner vault documents."
+                  />
+                </div>
+              </ProfileInfoCard>
+            )}
+
+            {isLawyer && (
+              <ProfileInfoCard
+                eyebrow="Legal Advisor Access"
+                title="Legacy claim review privileges"
+                description="This approved Lawyer account can review Legacy Access Claims assigned by the platform administrator."
+              >
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Privilege
+                    icon={Gavel}
+                    title="Assigned claim review"
+                    description="Review Legacy Access Claims specifically assigned to this Lawyer account."
+                  />
+                  <Privilege
+                    icon={FileCheck2}
+                    title="Evidence review"
+                    description="Review claim documents and additional information submitted through the controlled claim workflow."
+                  />
+                  <Privilege
+                    icon={LockKeyhole}
+                    title="Scoped access"
+                    description="Legal review access is limited to assigned claims and does not provide unrestricted access to Owner vault records."
                   />
                 </div>
               </ProfileInfoCard>
@@ -134,10 +149,7 @@ export default function Profile() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-ink-900">
-                    Password
-                  </h3>
-
+                  <h3 className="text-sm font-semibold text-ink-900">Password</h3>
                   <p className="mt-1 text-xs leading-5 text-ink-500">
                     Keep your account password private and update it when required.
                   </p>
@@ -162,32 +174,28 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-ink-900">
-                    Account Status
-                  </p>
-
-                  <p className="text-xs text-ink-400">
-                    Current access information
-                  </p>
+                  <p className="text-sm font-semibold text-ink-900">Account Status</p>
+                  <p className="text-xs text-ink-400">Current access information</p>
                 </div>
               </div>
 
               <div className="profile-status-divider" />
 
-              <StatusRow
-                label="Role"
-                value={role.label}
-              />
-
+              <StatusRow label="Role" value={role.label} />
               <StatusRow
                 label="Status"
                 value={user.status || 'ACTIVE'}
                 success={!user.status || user.status === 'ACTIVE'}
               />
-
               <StatusRow
                 label="Access"
-                value={isAdmin ? 'Administrative' : 'Protected'}
+                value={
+                  isAdmin
+                    ? 'Administrative'
+                    : isLawyer
+                      ? 'Legal Review'
+                      : 'Protected'
+                }
                 success
               />
 
@@ -204,13 +212,19 @@ export default function Profile() {
 
               <div>
                 <p className="text-xs font-semibold text-brand-900">
-                  {isAdmin ? 'Administrative security boundary' : 'Protected account'}
+                  {isAdmin
+                    ? 'Administrative security boundary'
+                    : isLawyer
+                      ? 'Legal review security boundary'
+                      : 'Protected account'}
                 </p>
 
                 <p className="mt-1 text-xs leading-5 text-brand-700">
                   {isAdmin
                     ? 'This role can manage accounts and registration verification, while private Owner vault documents remain role-protected.'
-                    : 'Your available actions are determined by your authenticated role and assigned permissions.'}
+                    : isLawyer
+                      ? 'This role can review only assigned Legacy Access Claims. Private Owner vault documents remain protected outside the authorized claim workflow.'
+                      : 'Your available actions are determined by your authenticated role and assigned permissions.'}
                 </p>
               </div>
             </div>
@@ -221,7 +235,7 @@ export default function Profile() {
   );
 }
 
-function AdminPrivilege({ icon: Icon, title, description }) {
+function Privilege({ icon: Icon, title, description }) {
   return (
     <div className="rounded-xl border border-ink-100 bg-ink-50/60 p-4">
       <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-white text-brand-600 shadow-sm">
@@ -234,11 +248,7 @@ function AdminPrivilege({ icon: Icon, title, description }) {
   );
 }
 
-function ProfileField({
-  icon: Icon,
-  label,
-  value,
-}) {
+function ProfileField({ icon: Icon, label, value }) {
   return (
     <div className="profile-field">
       <div className="profile-field-icon">
@@ -258,24 +268,12 @@ function ProfileField({
   );
 }
 
-function StatusRow({
-  label,
-  value,
-  success = false,
-}) {
+function StatusRow({ label, value, success = false }) {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-xs text-ink-500">
-        {label}
-      </span>
+      <span className="text-xs text-ink-500">{label}</span>
 
-      <span
-        className={
-          success
-            ? 'profile-status-success'
-            : 'profile-status-value'
-        }
-      >
+      <span className={success ? 'profile-status-success' : 'profile-status-value'}>
         {value}
       </span>
     </div>
