@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import protect from '../middleware/authMiddleware.js';
+import { getCurrentProfile } from '../controllers/profileReadController.js';
 import {
   requestEmailChangeOTP,
   verifyEmailChangeOTP,
@@ -10,6 +11,7 @@ import {
 
 const router = Router();
 
+router.get('/', protect, getCurrentProfile);
 router.post('/contact/email/request-otp', protect, requestEmailChangeOTP);
 router.post('/contact/email/verify', protect, verifyEmailChangeOTP);
 router.post('/contact/phone/request-otp', protect, requestPhoneChangeOTP);
