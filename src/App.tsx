@@ -17,6 +17,7 @@ import LandingPage from './pages/LandingPage';
 import AboutUs from './pages/AboutUs';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
+import RegistrationChoice from './pages/RegistrationChoice';
 import Register from './pages/Register';
 import LawyerRegister from './pages/LawyerRegister';
 import PendingApproval from './pages/PendingApproval';
@@ -124,6 +125,15 @@ export default function App() {
 
           <Route
             path="/register"
+            element={
+              <PublicOnlyRoute>
+                <RegistrationChoice />
+              </PublicOnlyRoute>
+            }
+          />
+
+          <Route
+            path="/register-owner"
             element={
               <PublicOnlyRoute>
                 <Register />

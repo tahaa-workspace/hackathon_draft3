@@ -1,11 +1,14 @@
+import { useEffect } from 'react';
 import {
   AtSign,
   BadgeCheck,
+  CheckCircle2,
   FileCheck2,
   Gavel,
   KeyRound,
   LockKeyhole,
   Mail,
+  Phone,
   Shield,
   User,
   UserCog,
@@ -16,9 +19,11 @@ import { useNavigate } from 'react-router-dom';
 
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import { getCurrentProfile } from '../services/authService';
 
 import ProfileHero from '../components/profile/ProfileHero';
 import ProfileInfoCard from '../components/profile/ProfileInfoCard';
+import ProfileContactEditor from '../components/profile/ProfileContactEditor';
 
 import '../styles/profile.css';
 
@@ -55,8 +60,24 @@ const DEFAULT_ROLE_META = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateCurrentUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+
+    getCurrentProfile()
+      .then((freshUser) => {
+        if (active && freshUser) updateCurrentUser(freshUser);
+      })
+      .catch((error) => {
+        console.error('Unable to refresh profile details:', error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [updateCurrentUser]);
 
   if (!user) return null;
 
@@ -81,9 +102,28 @@ export default function Profile() {
               <div className="profile-information-grid">
                 <ProfileField icon={User} label="Full name" value={user.name} />
                 <ProfileField icon={AtSign} label="Username" value={user.username} />
-                <ProfileField icon={Mail} label="Email address" value={user.email} />
+                <ProfileField
+                  icon={Mail}
+                  label="Email address"
+                  value={user.email}
+                  verified={Boolean(user.emailVerified)}
+                />
+                <ProfileField
+                  icon={Phone}
+                  label="Mobile number"
+                  value={user.phone}
+                  verified={Boolean(user.phoneVerified)}
+                />
                 <ProfileField icon={BadgeCheck} label="Account role" value={role.label} />
               </div>
+            </ProfileInfoCard>
+
+            <ProfileInfoCard
+              eyebrow="Verified Contact"
+              title="Update email or mobile"
+              description="A new email address or mobile number is saved only after OTP verification succeeds."
+            >
+              <ProfileContactEditor />
             </ProfileInfoCard>
 
             {isAdmin && (
@@ -188,6 +228,16 @@ export default function Profile() {
                 success={!user.status || user.status === 'ACTIVE'}
               />
               <StatusRow
+                label="Email"
+                value={user.emailVerified ? 'Verified' : 'Not verified'}
+                success={Boolean(user.emailVerified)}
+              />
+              <StatusRow
+                label="Mobile"
+                value={user.phoneVerified ? 'Verified' : 'Not verified'}
+                success={Boolean(user.phoneVerified)}
+              />
+              <StatusRow
                 label="Access"
                 value={
                   isAdmin
@@ -248,21 +298,33 @@ function Privilege({ icon: Icon, title, description }) {
   );
 }
 
-function ProfileField({ icon: Icon, label, value }) {
+function ProfileField({ icon: Icon, label, value, verified = false }) {
   return (
     <div className="profile-field">
       <div className="profile-field-icon">
         <Icon size={17} />
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-400">
           {label}
         </p>
 
-        <p className="mt-1 truncate text-sm font-semibold text-ink-800">
-          {value || 'Not available'}
-        </p>
+        <div className="mt-1 flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-semibold text-ink-800">
+            {value || 'Not available'}
+          </p>
+
+          {verified && (
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
+              title={`${label} verified`}
+            >
+              <CheckCircle2 size={12} />
+              Verified
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import beneficiaryRoutes from './routes/beneficiaryRoutes.js';
 import legacyClaimRoutes from './routes/legacyClaimRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/beneficiaries', beneficiaryRoutes);
 app.use("/api/documents", documentRoutes);
 app.use('/api/legacy-claims', legacyClaimRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api/contact', contactRoutes);
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found.' });
