@@ -4,6 +4,10 @@ import streamifier from 'streamifier';
 import User from '../models/User.js';
 import transporter from '../config/mailer.js';
 import cloudinary from '../config/cloudinary.js';
+import {
+  encryptAadhaarBuffer,
+  uploadEncryptedAadhaar,
+} from "../services/aadhaarEncryptionService.js";
 
 const SALT_ROUNDS = 12;
 /*
@@ -12,48 +16,7 @@ UPLOAD BENEFICIARY AADHAAR
 =========================================================
 */
 
-function uploadBeneficiaryAadhaar(file) {
-  return new Promise(
-    (resolve, reject) => {
 
-      const uploadStream =
-        cloudinary.uploader.upload_stream(
-          {
-            folder:
-              'digital-legacy/beneficiary-aadhaar',
-
-            resource_type:
-              'auto',
-
-            type:
-              'authenticated',
-
-            use_filename:
-              false,
-
-            unique_filename:
-              true,
-          },
-
-          (error, result) => {
-
-            if (error) {
-              reject(error);
-            } else {
-              resolve(result);
-            }
-
-          }
-        );
-
-      streamifier
-        .createReadStream(
-          file.buffer
-        )
-        .pipe(uploadStream);
-    }
-  );
-}
 
 async function sendBeneficiaryCredentialsEmail({
   recipientEmail,
@@ -349,10 +312,19 @@ export async function createBeneficiary(
     =========================================
     */
 
-    aadhaarUpload =
-      await uploadBeneficiaryAadhaar(
-        req.file
-      );
+const {
+  encrypted,
+  encryption,
+} =
+  encryptAadhaarBuffer(
+    req.file.buffer
+  );
+
+aadhaarUpload =
+  await uploadEncryptedAadhaar(
+    encrypted,
+    "digital-legacy/encrypted-aadhaar/beneficiaries"
+  );
 
     /*
     =========================================
@@ -413,23 +385,31 @@ export async function createBeneficiary(
         =========================================
         */
 
-        aadhaarDocument: {
+aadhaarDocument: {
 
-          publicId:
-            aadhaarUpload.public_id,
+  publicId:
+    aadhaarUpload.public_id,
 
-          resourceType:
-            aadhaarUpload.resource_type,
+  resourceType:
+    "raw",
 
-          originalName:
-            req.file.originalname,
+  deliveryType:
+    "authenticated",
 
-          mimeType:
-            req.file.mimetype,
+  originalName:
+    req.file.originalname,
 
-          fileSize:
-            req.file.size,
-        },
+  mimeType:
+    req.file.mimetype,
+
+  fileSize:
+    req.file.size,
+
+  encryptedSize:
+    encrypted.length,
+
+  encryption,
+},
       });
 
     /*
@@ -597,21 +577,19 @@ export async function createBeneficiary(
       aadhaarUpload?.public_id
     ) {
 
-      await cloudinary.uploader
-        .destroy(
-          aadhaarUpload.public_id,
-          {
-            resource_type:
-              aadhaarUpload.resource_type ||
-              'image',
+      await cloudinary.uploader.destroy(
+  aadhaarUpload.public_id,
+  {
+    resource_type:
+      "raw",
 
-            type:
-              'authenticated',
+    type:
+      "authenticated",
 
-            invalidate:
-              true,
-          }
-        )
+    invalidate:
+      true,
+  }
+)
         .catch(
           (cleanupError) => {
 

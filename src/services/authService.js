@@ -203,10 +203,43 @@ export async function updateUserStatus(id, status) {
   );
 }
 
-export async function getAadhaarReviewUrl(id) {
-  return request(
-    `/admin/users/${id}/aadhaar`
-  );
+export async function getAadhaarReviewFile(
+  userId
+) {
+  const token =
+    sessionStorage.getItem(
+      'dl_token'
+    );
+
+  const response =
+    await fetch(
+      `/api/admin/users/${userId}/aadhaar`,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+      }
+    );
+
+
+  if (!response.ok) {
+
+    const data =
+      await response
+        .json()
+        .catch(
+          () => ({})
+        );
+
+    throw new Error(
+      data.message ||
+      'Unable to open Aadhaar document.'
+    );
+  }
+
+
+  return response.blob();
 }
 
 export async function getLawyerCredentialReviewUrl(id) {

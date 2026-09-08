@@ -22,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   approveUser,
   rejectUser,
-  getAadhaarReviewUrl,
+  getAadhaarReviewFile,
   getLawyerCredentialReviewUrl,
   getPendingRegistrations,
   getAllUsers,
@@ -240,33 +240,146 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleViewVerification = async (item) => {
-    setDocumentLoadingId(item.id);
-    setPendingError('');
+ const handleViewVerification =
+  async (item) => {
 
-    const isLawyer = item.role === 'LAWYER';
-    const label = isLawyer ? 'professional credential' : 'Aadhaar document';
-    const reviewWindow = window.open('', '_blank');
+    setDocumentLoadingId(
+      item.id
+    );
 
-    if (!reviewWindow) {
-      setDocumentLoadingId(null);
-      setPendingError(`The browser blocked the ${label} review window. Please allow pop-ups for this site and try again.`);
-      return;
-    }
+    setPendingError(
+      ''
+    );
 
-    reviewWindow.document.title = `Loading ${label} review…`;
-    reviewWindow.document.body.innerHTML = `<div style="font-family:Arial,sans-serif;padding:24px;color:#334155">Loading secure ${label}…</div>`;
+    const isLawyer =
+      item.role === 'LAWYER';
+
+    const label =
+      isLawyer
+        ? 'professional credential'
+        : 'Aadhaar document';
 
     try {
-      const result = isLawyer
-        ? await getLawyerCredentialReviewUrl(item.id)
-        : await getAadhaarReviewUrl(item.id);
-      reviewWindow.location.replace(result.url);
+
+      /*
+      =========================================
+      LAWYER DOCUMENT
+      =========================================
+
+      Lawyer credentials are still using the
+      existing authenticated Cloudinary URL.
+      */
+
+      if (isLawyer) {
+
+        const result =
+          await getLawyerCredentialReviewUrl(
+            item.id
+          );
+
+        const reviewWindow =
+          window.open(
+            result.url,
+            '_blank',
+            'noopener,noreferrer'
+          );
+
+        if (!reviewWindow) {
+          throw new Error(
+            'The browser blocked the professional credential window. Please allow pop-ups and try again.'
+          );
+        }
+
+        return;
+      }
+
+
+      /*
+      =========================================
+      OWNER AADHAAR
+      =========================================
+
+      Owner Aadhaar is now encrypted.
+
+      Backend:
+      - downloads encrypted .vault
+      - decrypts AES-256-GCM
+      - returns original PDF/JPG/PNG
+
+      Frontend receives it as Blob.
+      */
+
+      const blob =
+        await getAadhaarReviewFile(
+          item.id
+        );
+
+
+      /*
+      =========================================
+      CREATE TEMPORARY LOCAL BLOB URL
+      =========================================
+      */
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+
+      /*
+      =========================================
+      OPEN DECRYPTED AADHAAR
+      =========================================
+      */
+
+      const popup =
+        window.open(
+          url,
+          '_blank',
+          'noopener,noreferrer'
+        );
+
+
+      if (!popup) {
+
+        URL.revokeObjectURL(
+          url
+        );
+
+        throw new Error(
+          'Browser blocked the Aadhaar document window. Please allow pop-ups for this site.'
+        );
+      }
+
+
+      /*
+      =========================================
+      CLEAN TEMPORARY URL
+      =========================================
+      */
+
+      setTimeout(
+        () =>
+          URL.revokeObjectURL(
+            url
+          ),
+        60000
+      );
+
     } catch (err) {
-      reviewWindow.close();
-      setPendingError(err.message);
+
+      setPendingError(
+        err.message ||
+        `Unable to open ${label}.`
+      );
+
     } finally {
-      setDocumentLoadingId(null);
+
+      setDocumentLoadingId(
+        null
+      );
+
     }
   };
 

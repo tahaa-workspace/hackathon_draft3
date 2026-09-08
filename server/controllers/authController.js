@@ -6,6 +6,10 @@ import cloudinary from '../config/cloudinary.js';
 import crypto from "crypto";
 import PasswordChangeOTP from "../models/PasswordChangeOTP.js";
 import transporter from "../config/mailer.js";
+import {
+  encryptAadhaarBuffer,
+  uploadEncryptedAadhaar,
+} from "../services/aadhaarEncryptionService.js";
 
 const SALT_ROUNDS = 12;
 
@@ -42,9 +46,9 @@ async function uploadAuthenticatedFile(file, folder) {
   });
 }
 
-async function uploadAadhaar(file) {
-  return uploadAuthenticatedFile(file, 'digital-legacy/aadhaar');
-}
+// async function uploadAadhaar(file) {
+//   return uploadAuthenticatedFile(file, 'digital-legacy/aadhaar');
+// }
 
 async function uploadLawyerCredential(file) {
   return uploadAuthenticatedFile(file, 'digital-legacy/lawyer-credentials');
@@ -100,7 +104,19 @@ export async function register(req, res) {
 
   let uploadResult;
   try {
-    uploadResult = await uploadAadhaar(req.file);
+    const {
+  encrypted,
+  encryption,
+} =
+  encryptAadhaarBuffer(
+    req.file.buffer
+  );
+
+uploadResult =
+  await uploadEncryptedAadhaar(
+    encrypted,
+    "digital-legacy/encrypted-aadhaar/owners"
+  );
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const user = await User.create({
@@ -112,13 +128,31 @@ export async function register(req, res) {
       status: 'PENDING',
       createdBy: null,
       mustChangePassword: false,
-      aadhaarDocument: {
-        publicId: uploadResult.public_id,
-        resourceType: uploadResult.resource_type,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        fileSize: req.file.size,
-      },
+aadhaarDocument: {
+
+  publicId:
+    uploadResult.public_id,
+
+  resourceType:
+    "raw",
+
+  deliveryType:
+    "authenticated",
+
+  originalName:
+    req.file.originalname,
+
+  mimeType:
+    req.file.mimetype,
+
+  fileSize:
+    req.file.size,
+
+  encryptedSize:
+    encrypted.length,
+
+  encryption,
+},
       verification: {
         reviewedBy: null,
         reviewedAt: null,
@@ -133,7 +167,8 @@ export async function register(req, res) {
   } catch (error) {
     if (uploadResult?.public_id) {
       await cloudinary.uploader.destroy(uploadResult.public_id, {
-        resource_type: uploadResult.resource_type || 'image',
+       resource_type:
+  "raw",
         type: 'authenticated',
       }).catch(() => {});
     }
