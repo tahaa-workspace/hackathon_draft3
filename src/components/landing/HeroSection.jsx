@@ -5,7 +5,6 @@ import {
   FileText,
   KeyRound,
   Lock,
-  Shield,
   ShieldCheck,
   Sparkles,
   Users,
@@ -157,8 +156,12 @@ export default function HeroSection({
             <div className="landing-vault-surface">
               <div className="flex items-center justify-between border-b border-ink-100 pb-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-violet text-white shadow-lg shadow-brand-600/20">
-                    <Shield size={18} />
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-brand-600/15 ring-1 ring-ink-100">
+                    <img
+                      src="/nextgen-vault-logo.png"
+                      alt="Next Gen Vault"
+                      className="h-9 w-9 object-contain"
+                    />
                   </div>
 
                   <div>
