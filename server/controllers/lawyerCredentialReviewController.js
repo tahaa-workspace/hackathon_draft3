@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import cloudinary from '../config/cloudinary.js';
 
 import User from '../models/User.js';
 import {
@@ -42,6 +43,16 @@ function isValidReviewToken({ userId, expiresAt, token }) {
   );
 }
 
+function isEncryptedCredential(credential) {
+  return Boolean(
+    credential?.resourceType === 'raw' &&
+      credential?.deliveryType === 'authenticated' &&
+      credential?.encryption?.algorithm === 'aes-256-gcm' &&
+      credential?.encryption?.iv &&
+      credential?.encryption?.authTag
+  );
+}
+
 export async function getLawyerCredentialReviewUrl(req, res) {
   try {
     const { id } = req.params;
@@ -60,19 +71,31 @@ export async function getLawyerCredentialReviewUrl(req, res) {
       });
     }
 
-    if (
-      credential.resourceType !== 'raw' ||
-      credential.deliveryType !== 'authenticated' ||
-      credential.encryption?.algorithm !== 'aes-256-gcm' ||
-      !credential.encryption?.iv ||
-      !credential.encryption?.authTag
-    ) {
-      return res.status(500).json({
-        message: 'Lawyer credential is not stored as a valid encrypted vault file.',
+    const expiresAt = Math.floor(Date.now() / 1000) + REVIEW_URL_TTL_SECONDS;
+
+    // Backward compatibility: credentials uploaded before this encryption change
+    // can still be reviewed. Every newly registered Lawyer uses the encrypted path below.
+    if (!isEncryptedCredential(credential)) {
+      const url = cloudinary.url(credential.publicId, {
+        resource_type: credential.resourceType || 'image',
+        type: credential.deliveryType || 'authenticated',
+        sign_url: true,
+        secure: true,
+        expires_at: expiresAt,
+      });
+
+      return res.status(200).json({
+        url,
+        expiresAt,
+        legacyStorage: true,
+        document: {
+          originalName: credential.originalName,
+          mimeType: credential.mimeType,
+          fileSize: credential.fileSize,
+        },
       });
     }
 
-    const expiresAt = Math.floor(Date.now() / 1000) + REVIEW_URL_TTL_SECONDS;
     const token = createReviewToken({ userId: user._id.toString(), expiresAt });
 
     return res.status(200).json({
@@ -80,6 +103,7 @@ export async function getLawyerCredentialReviewUrl(req, res) {
         `/api/admin/lawyer-credential-view/${user._id.toString()}` +
         `?expires=${expiresAt}&token=${token}`,
       expiresAt,
+      encryptedStorage: true,
       document: {
         originalName: credential.originalName,
         mimeType: credential.mimeType,
@@ -126,15 +150,9 @@ export async function viewLawyerCredential(req, res) {
       });
     }
 
-    if (
-      credential.resourceType !== 'raw' ||
-      credential.deliveryType !== 'authenticated' ||
-      credential.encryption?.algorithm !== 'aes-256-gcm' ||
-      !credential.encryption?.iv ||
-      !credential.encryption?.authTag
-    ) {
-      return res.status(500).json({
-        message: 'Lawyer credential encryption metadata is missing or invalid.',
+    if (!isEncryptedCredential(credential)) {
+      return res.status(400).json({
+        message: 'This review route is only for encrypted lawyer credentials.',
       });
     }
 
