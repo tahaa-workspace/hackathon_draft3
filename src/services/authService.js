@@ -180,6 +180,39 @@ export async function loginUser({
 
 
 /* =========================================================
+   PROFILE CONTACT VERIFICATION
+   ========================================================= */
+
+export async function requestProfileEmailOTP(email) {
+  return request('/profile/contact/email/request-otp', {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+export async function verifyProfileEmailOTP(email, otp) {
+  return request('/profile/contact/email/verify', {
+    method: 'POST',
+    body: { email, otp },
+  });
+}
+
+export async function requestProfilePhoneOTP(phone) {
+  return request('/profile/contact/phone/request-otp', {
+    method: 'POST',
+    body: { phone },
+  });
+}
+
+export async function verifyProfilePhoneOTP(phone, otp) {
+  return request('/profile/contact/phone/verify', {
+    method: 'POST',
+    body: { phone, otp },
+  });
+}
+
+
+/* =========================================================
    ADMIN
    ========================================================= */
 
