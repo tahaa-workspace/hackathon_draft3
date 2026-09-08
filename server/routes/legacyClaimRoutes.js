@@ -22,6 +22,7 @@ import {
   rejectLegacyClaim,
   getAdditionalEvidenceFile,
 } from '../controllers/legacyClaimInformationController.js';
+import { cleanupOrphanLegacyClaims } from '../controllers/legacyClaimCleanupController.js';
 
 const router = Router();
 
@@ -56,7 +57,13 @@ router.post(
 );
 
 router.get('/mine', protect, authorize('BENEFICIARY'), listMyLegacyClaims);
-router.get('/admin', protect, authorize('ADMIN'), listAdminLegacyClaims);
+router.get(
+  '/admin',
+  protect,
+  authorize('ADMIN'),
+  cleanupOrphanLegacyClaims,
+  listAdminLegacyClaims
+);
 
 router.put('/admin/:id/review', protect, authorize('ADMIN'), blockDeprecatedReviewActions, adminReviewClaim);
 router.get('/lawyer', protect, authorize('LAWYER'), listLawyerClaims);
