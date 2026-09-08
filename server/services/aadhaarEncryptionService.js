@@ -2,6 +2,9 @@ import crypto from "crypto";
 import streamifier from "streamifier";
 import cloudinary from "../config/cloudinary.js";
 
+const ENCRYPTED_AADHAAR_FOLDER = "digital-legacy/encrypted-aadhaar/owners";
+const AADHAAR_PLACEHOLDER_FOLDER = "digital-legacy/aadhaar";
+
 function getEncryptionKey() {
   const configuredKey = process.env.DOCUMENT_ENCRYPTION_KEY;
 
@@ -63,18 +66,9 @@ export function decryptAadhaarBuffer(encryptedBuffer, encryption) {
   ]);
 }
 
-function normalizeAadhaarFolder(folder) {
-  if (folder === "digital-legacy/encrypted-aadhaar/owners") {
-    return "digital-legacy/aadhaar/owners";
-  }
-
-  return folder;
-}
-
-export async function uploadEncryptedAadhaar(encryptedBuffer, folder) {
+export async function uploadEncryptedAadhaar(encryptedBuffer) {
   return new Promise((resolve, reject) => {
-    const safeFolder = normalizeAadhaarFolder(folder);
-    const publicId = `${safeFolder}/${crypto.randomUUID()}.vault`;
+    const publicId = `${ENCRYPTED_AADHAAR_FOLDER}/${crypto.randomUUID()}.vault`;
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -95,6 +89,51 @@ export async function uploadEncryptedAadhaar(encryptedBuffer, folder) {
 
     streamifier.createReadStream(encryptedBuffer).pipe(uploadStream);
   });
+}
+
+function buildAadhaarPlaceholderSvg() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+      <rect width="900" height="600" fill="#f1f5f9"/>
+      <rect x="245" y="95" width="410" height="410" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="6"/>
+      <circle cx="450" cy="220" r="48" fill="#2563eb"/>
+      <path d="M428 220 L444 236 L476 202" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="315" y="300" width="270" height="22" rx="11" fill="#94a3b8"/>
+      <rect x="345" y="350" width="210" height="18" rx="9" fill="#cbd5e1"/>
+      <text x="450" y="430" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#1e293b">ENCRYPTED AADHAAR</text>
+      <text x="450" y="465" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#64748b">Original identity document is protected in the vault</text>
+    </svg>
+  `;
+
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+export async function uploadAadhaarPlaceholder() {
+  return cloudinary.uploader.upload(buildAadhaarPlaceholderSvg(), {
+    folder: AADHAAR_PLACEHOLDER_FOLDER,
+    public_id: `aadhaar-${crypto.randomUUID()}`,
+    resource_type: "image",
+    type: "upload",
+    overwrite: false,
+    use_filename: false,
+    unique_filename: false,
+  });
+}
+
+export async function deleteAadhaarPlaceholder(placeholderPublicId) {
+  if (!placeholderPublicId) {
+    return;
+  }
+
+  const result = await cloudinary.uploader.destroy(placeholderPublicId, {
+    resource_type: "image",
+    type: "upload",
+    invalidate: true,
+  });
+
+  if (result.result !== "ok" && result.result !== "not found") {
+    throw new Error("Aadhaar placeholder could not be deleted from Cloudinary.");
+  }
 }
 
 export async function downloadEncryptedAadhaar(aadhaarDocument) {
