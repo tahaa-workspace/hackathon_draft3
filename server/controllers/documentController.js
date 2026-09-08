@@ -612,3 +612,142 @@ export const getDocumentAccessUrl = async (req, res) => {
 export const getMyDocuments = async (req, res) => {
     return getDocuments(req, res);
 };
+export const deleteDocument = async (req, res) => {
+    try {
+        /*
+        =========================================
+        FIND DOCUMENT OWNED BY CURRENT OWNER
+        =========================================
+        */
+
+        const document =
+            await Document.findOne({
+                _id: req.params.id,
+                ownerId: req.user.id,
+            });
+
+        if (!document) {
+            return res.status(404).json({
+                message:
+                    "Document not found or you do not own this document.",
+            });
+        }
+
+        /*
+        =========================================
+        DELETE REAL ENCRYPTED CLOUDINARY FILE
+        =========================================
+        */
+
+        if (document.publicId) {
+            const encryptedDeleteResult =
+                await cloudinary.uploader.destroy(
+                    document.publicId,
+                    {
+                        resource_type:
+                            document.resourceType ||
+                            "raw",
+
+                        type:
+                            document.deliveryType ||
+                            "authenticated",
+
+                        invalidate: true,
+                    }
+                );
+
+            console.log(
+                "Encrypted document delete:",
+                document.publicId,
+                encryptedDeleteResult
+            );
+
+            if (
+                encryptedDeleteResult.result !==
+                    "ok" &&
+                encryptedDeleteResult.result !==
+                    "not found"
+            ) {
+                return res.status(500).json({
+                    message:
+                        "Unable to delete the encrypted document from Cloudinary. MongoDB metadata was kept so deletion can be retried.",
+                });
+            }
+        }
+
+        /*
+        =========================================
+        DELETE PLACEHOLDER IMAGE
+        =========================================
+        */
+
+        if (document.placeholderPublicId) {
+            const placeholderDeleteResult =
+                await cloudinary.uploader.destroy(
+                    document.placeholderPublicId,
+                    {
+                        resource_type:
+                            "image",
+
+                        type:
+                            "upload",
+
+                        invalidate: true,
+                    }
+                );
+
+            console.log(
+                "Placeholder delete:",
+                document.placeholderPublicId,
+                placeholderDeleteResult
+            );
+
+            if (
+                placeholderDeleteResult.result !==
+                    "ok" &&
+                placeholderDeleteResult.result !==
+                    "not found"
+            ) {
+                return res.status(500).json({
+                    message:
+                        "Encrypted document was deleted, but the Cloudinary placeholder could not be deleted. MongoDB metadata was kept for cleanup.",
+                });
+            }
+        }
+
+        /*
+        =========================================
+        DELETE MONGODB METADATA
+        =========================================
+        */
+
+        await Document.deleteOne({
+            _id: document._id,
+            ownerId: req.user.id,
+        });
+
+        return res.status(200).json({
+            message:
+                "Document permanently deleted from Cloudinary and MongoDB.",
+
+            deleted: true,
+
+            documentId:
+                document._id.toString(),
+        });
+
+    } catch (error) {
+        console.error(
+            "Delete document error:",
+            error
+        );
+
+        return res.status(500).json({
+            message:
+                "Failed to delete document.",
+
+            error:
+                error.message,
+        });
+    }
+};
