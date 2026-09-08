@@ -183,6 +183,11 @@ export async function loginUser({
    PROFILE CONTACT VERIFICATION
    ========================================================= */
 
+export async function getCurrentProfile() {
+  const data = await request('/profile');
+  return data.user;
+}
+
 export async function requestProfileEmailOTP(email) {
   return request('/profile/contact/email/request-otp', {
     method: 'POST',
