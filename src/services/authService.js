@@ -52,7 +52,6 @@ async function request(
   return data;
 }
 
-
 /* =========================================================
    AUTHENTICATION
    ========================================================= */
@@ -105,11 +104,7 @@ export async function registerUser({
   formData.append('phone', phone);
   formData.append('phoneVerificationToken', phoneVerificationToken);
   formData.append('password', password);
-  formData.append(
-    'confirmPassword',
-    confirmPassword
-  );
-
+  formData.append('confirmPassword', confirmPassword);
   formData.append('aadhaar', aadhaar);
 
   return request('/auth/register', {
@@ -164,7 +159,6 @@ export async function registerLawyer({
   });
 }
 
-
 export async function loginUser({
   identifier,
   password,
@@ -177,7 +171,6 @@ export async function loginUser({
     },
   });
 }
-
 
 /* =========================================================
    PROFILE CONTACT VERIFICATION
@@ -216,6 +209,22 @@ export async function verifyProfilePhoneOTP(phone, otp) {
   });
 }
 
+/* =========================================================
+   ACCOUNT DELETION
+   ========================================================= */
+
+export async function deleteCurrentAccount({
+  password,
+  confirmation,
+}) {
+  return request('/profile', {
+    method: 'DELETE',
+    body: {
+      password,
+      confirmation,
+    },
+  });
+}
 
 /* =========================================================
    ADMIN
@@ -241,41 +250,28 @@ export async function updateUserStatus(id, status) {
   );
 }
 
-export async function getAadhaarReviewFile(
-  userId
-) {
-  const token =
-    sessionStorage.getItem(
-      'dl_token'
-    );
+export async function getAadhaarReviewFile(userId) {
+  const token = sessionStorage.getItem('dl_token');
 
-  const response =
-    await fetch(
-      `/api/admin/users/${userId}/aadhaar`,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${token}`,
-        },
-      }
-    );
-
+  const response = await fetch(
+    `/api/admin/users/${userId}/aadhaar`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
   if (!response.ok) {
-
-    const data =
-      await response
-        .json()
-        .catch(
-          () => ({})
-        );
+    const data = await response
+      .json()
+      .catch(() => ({}));
 
     throw new Error(
       data.message ||
       'Unable to open Aadhaar document.'
     );
   }
-
 
   return response.blob();
 }
@@ -310,7 +306,6 @@ export async function rejectUser(
   );
 }
 
-
 /* =========================================================
    BENEFICIARY
    ========================================================= */
@@ -343,7 +338,6 @@ export async function createBeneficiary({
 export async function listBeneficiaries() {
   return request('/beneficiaries');
 }
-
 
 /* =========================================================
    SESSION MANAGEMENT
@@ -378,11 +372,8 @@ export function loadStoredSession() {
   localStorage.removeItem('dl_token');
   localStorage.removeItem('dl_user');
 
-  const token =
-    sessionStorage.getItem('dl_token');
-
-  const userJson =
-    sessionStorage.getItem('dl_user');
+  const token = sessionStorage.getItem('dl_token');
+  const userJson = sessionStorage.getItem('dl_user');
 
   if (!token || !userJson) {
     return null;
@@ -401,50 +392,45 @@ export function loadStoredSession() {
   }
 }
 
-
 /* =========================================================
    PASSWORD CHANGE
    ========================================================= */
 
 export async function requestPasswordChangeOTP() {
-    return request(
-        "/auth/change-password/request-otp",
-        {
-            method: "POST",
-        }
-    );
+  return request(
+    '/auth/change-password/request-otp',
+    {
+      method: 'POST',
+    }
+  );
 }
 
-export async function verifyPasswordChangeOTP(
-    otp
-) {
-    return request(
-        "/auth/change-password/verify-otp",
-        {
-            method: "POST",
-
-            body: {
-                otp,
-            },
-        }
-    );
+export async function verifyPasswordChangeOTP(otp) {
+  return request(
+    '/auth/change-password/verify-otp',
+    {
+      method: 'POST',
+      body: {
+        otp,
+      },
+    }
+  );
 }
 
 export async function completePasswordChange({
-    currentPassword,
-    newPassword,
-    confirmNewPassword,
+  currentPassword,
+  newPassword,
+  confirmNewPassword,
 }) {
-    return request(
-        "/auth/change-password/complete",
-        {
-            method: "POST",
-
-            body: {
-                currentPassword,
-                newPassword,
-                confirmNewPassword,
-            },
-        }
-    );
+  return request(
+    '/auth/change-password/complete',
+    {
+      method: 'POST',
+      body: {
+        currentPassword,
+        newPassword,
+        confirmNewPassword,
+      },
+    }
+  );
 }
