@@ -191,6 +191,7 @@ export default function Register() {
       setEmailVerificationToken('');
       setVerifiedEmail('');
       setEmailResendIn(RESEND_SECONDS);
+
       setEmailOtpMessage(
         result.message || 'OTP sent to your email address.'
       );
@@ -221,6 +222,12 @@ export default function Register() {
       setEmailVerified(true);
       setEmailVerificationToken(result.verificationToken);
       setVerifiedEmail(form.email);
+
+      // Stop the resend timer immediately after successful verification
+      setEmailResendIn(0);
+
+      // Mark the OTP flow as complete
+      setEmailOtpSent(false);
 
       setEmailOtpMessage(
         result.message || 'Email address verified successfully.'
@@ -296,6 +303,12 @@ export default function Register() {
       setPhoneVerified(true);
       setPhoneVerificationToken(result.verificationToken);
       setVerifiedPhone(form.phone);
+
+      // Stop the resend timer immediately after successful verification
+      setResendIn(0);
+
+      // Mark the OTP flow as complete
+      setOtpSent(false);
 
       setOtpMessage(
         result.message || 'Mobile number verified successfully.'
@@ -490,6 +503,7 @@ export default function Register() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Mail size={17} className="text-brand-700" />
+
               <p className="text-sm font-semibold text-ink-800">
                 Email verification
               </p>
@@ -530,14 +544,19 @@ export default function Register() {
               }
             >
               {emailOtpLoading && (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2
+                  size={16}
+                  className="animate-spin"
+                />
               )}
 
-              {emailOtpSent
-                ? emailResendIn > 0
-                  ? `Resend in ${emailResendIn}s`
-                  : 'Resend OTP'
-                : 'Send OTP'}
+              {emailVerified
+                ? 'Verified'
+                : emailOtpSent
+                  ? emailResendIn > 0
+                    ? `Resend in ${emailResendIn}s`
+                    : 'Resend OTP'
+                  : 'Send OTP'}
             </button>
           </div>
 
@@ -551,7 +570,9 @@ export default function Register() {
                 value={emailOtp}
                 onChange={(event) =>
                   setEmailOtp(
-                    event.target.value.replace(/\D/g, '').slice(0, 6)
+                    event.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 6)
                   )
                 }
                 placeholder="Enter 6-digit email OTP"
@@ -563,11 +584,15 @@ export default function Register() {
                 className="btn-primary registration-otp-button"
                 onClick={handleVerifyEmailOtp}
                 disabled={
-                  emailVerifyLoading || emailOtp.length !== 6
+                  emailVerifyLoading ||
+                  emailOtp.length !== 6
                 }
               >
                 {emailVerifyLoading && (
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
                 )}
 
                 Verify Email
@@ -582,15 +607,20 @@ export default function Register() {
           )}
 
           <p className="mt-2 text-xs leading-5 text-ink-500">
-            A 6-digit OTP is sent to this email address and expires in 5
-            minutes.
+            {emailVerified
+              ? 'Email address verified successfully.'
+              : 'A 6-digit OTP is sent to this email address and expires in 5 minutes.'}
           </p>
         </div>
 
         <div className="registration-verification-card">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Smartphone size={17} className="text-brand-700" />
+              <Smartphone
+                size={17}
+                className="text-brand-700"
+              />
+
               <p className="text-sm font-semibold text-ink-800">
                 Mobile verification
               </p>
@@ -638,28 +668,37 @@ export default function Register() {
               }
             >
               {otpLoading && (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2
+                  size={16}
+                  className="animate-spin"
+                />
               )}
 
-              {otpSent
-                ? resendIn > 0
-                  ? `Resend in ${resendIn}s`
-                  : 'Resend OTP'
-                : 'Send OTP'}
+              {phoneVerified
+                ? 'Verified'
+                : otpSent
+                  ? resendIn > 0
+                    ? `Resend in ${resendIn}s`
+                    : 'Resend OTP'
+                  : 'Send OTP'}
             </button>
           </div>
 
           <div className="mt-2 flex items-center justify-between text-xs">
             <span
               className={
-                form.phone.length === 10
+                phoneVerified
                   ? 'font-medium text-green-600'
-                  : 'text-ink-400'
+                  : form.phone.length === 10
+                    ? 'font-medium text-green-600'
+                    : 'text-ink-400'
               }
             >
-              {form.phone.length === 10
-                ? 'Valid 10-digit number'
-                : 'Enter exactly 10 digits'}
+              {phoneVerified
+                ? 'Mobile number verified successfully'
+                : form.phone.length === 10
+                  ? 'Valid 10-digit number'
+                  : 'Enter exactly 10 digits'}
             </span>
 
             <span className="text-ink-400">
@@ -677,7 +716,9 @@ export default function Register() {
                 value={otp}
                 onChange={(event) =>
                   setOtp(
-                    event.target.value.replace(/\D/g, '').slice(0, 6)
+                    event.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 6)
                   )
                 }
                 placeholder="Enter 6-digit OTP"
@@ -689,11 +730,15 @@ export default function Register() {
                 className="btn-primary registration-otp-button"
                 onClick={handleVerifyOtp}
                 disabled={
-                  verifyLoading || otp.length !== 6
+                  verifyLoading ||
+                  otp.length !== 6
                 }
               >
                 {verifyLoading && (
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
                 )}
 
                 Verify OTP
@@ -708,9 +753,15 @@ export default function Register() {
           )}
 
           <p className="mt-2 text-xs leading-5 text-ink-500">
-            Demo mode: use one of these test numbers:{' '}
-            {DEMO_MOBILES.join(', ')}. The generated OTP is shown only in
-            the backend terminal and expires in 5 minutes.
+            {phoneVerified
+              ? 'Mobile number verified successfully.'
+              : (
+                  <>
+                    Demo mode: use one of these test numbers:{' '}
+                    {DEMO_MOBILES.join(', ')}. The generated OTP is shown only
+                    in the backend terminal and expires in 5 minutes.
+                  </>
+                )}
           </p>
         </div>
 
@@ -739,7 +790,9 @@ export default function Register() {
                   }
                   className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-ink-400 transition hover:text-brand-700"
                   aria-label={
-                    showPassword ? 'Hide password' : 'Show password'
+                    showPassword
+                      ? 'Hide password'
+                      : 'Show password'
                   }
                 >
                   {showPassword ? (
@@ -763,7 +816,9 @@ export default function Register() {
                 <input
                   id="confirmPassword"
                   type={
-                    showConfirmPassword ? 'text' : 'password'
+                    showConfirmPassword
+                      ? 'text'
+                      : 'password'
                   }
                   className="field-input !pr-11"
                   value={form.confirmPassword}
@@ -803,7 +858,10 @@ export default function Register() {
 
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {PASSWORD_RULES.map((rule) => {
-                const passed = rule.test(form.password);
+                const passed =
+                  rule.test(
+                    form.password
+                  );
 
                 return (
                   <div
@@ -830,7 +888,9 @@ export default function Register() {
                       )}
                     </span>
 
-                    <span>{rule.label}</span>
+                    <span>
+                      {rule.label}
+                    </span>
                   </div>
                 );
               })}
@@ -918,7 +978,10 @@ export default function Register() {
           }
         >
           {loading ? (
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2
+              size={16}
+              className="animate-spin"
+            />
           ) : (
             <UserPlus size={16} />
           )}
