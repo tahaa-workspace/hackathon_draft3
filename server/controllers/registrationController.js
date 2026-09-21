@@ -795,82 +795,115 @@ export async function requestRegistrationEmailOTP(
     }
 
 
-    try {
-
-      await transporter.sendMail({
-        from: {
-          name:
-            'NextGen Vault',
-
-          address:
-            process.env.EMAIL_USER,
-        },
-
-        to:
-          email,
-
-        subject:
-          'NextGen Vault - Verify Your Email',
-
-        text:
-          `Your NextGen Vault email verification OTP is ${otp}. It expires in 5 minutes.`,
-
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px">
-            <div style="border:1px solid #e2e8f0;border-radius:14px;padding:28px">
-              <h2 style="margin-top:0;color:#0f172a">NextGen Vault</h2>
-
-              <p style="color:#475569">
-                Use this OTP to verify your email address for owner registration.
-              </p>
-
-              <div style="
-                margin:24px 0;
-                padding:18px;
-                background:#f1f5f9;
-                border-radius:10px;
-                text-align:center;
-                font-size:32px;
-                letter-spacing:10px;
-                font-weight:bold;
-                color:#0f172a;
-              ">
-                ${otp}
-              </div>
-
-              <p style="color:#64748b">
-                This OTP expires in <strong>5 minutes</strong>.
-              </p>
-
-              <p style="color:#64748b;font-size:13px">
-                If you did not request this registration,
-                you can ignore this email.
-              </p>
-
-            </div>
-          </div>
-        `,
-      });
-
-    } catch (mailError) {
-
-      await RegistrationEmailVerification.deleteOne({
-        email,
-      });
+    const demoEmailOtpEnabled =
+      process.env.DEMO_EMAIL_OTP !== 'false';
 
 
-      console.error(
-        'Registration email OTP send error:',
-        mailError
+    if (demoEmailOtpEnabled) {
+
+      console.log(
+        '\n==============================================='
       );
 
+      console.log(
+        'NEXT GEN VAULT - DEMO EMAIL REGISTRATION OTP'
+      );
 
-      return res
-        .status(500)
-        .json({
-          message:
-            'Unable to send the email OTP. Please check the email configuration and try again.',
+      console.log(
+        `Email: ${email}`
+      );
+
+      console.log(
+        `OTP: ${otp}`
+      );
+
+      console.log(
+        'Valid for: 5 minutes'
+      );
+
+      console.log(
+        '===============================================\n'
+      );
+
+    } else {
+
+      try {
+
+        await transporter.sendMail({
+          from: {
+            name:
+              'NextGen Vault',
+
+            address:
+              process.env.EMAIL_USER,
+          },
+
+          to:
+            email,
+
+          subject:
+            'NextGen Vault - Verify Your Email',
+
+          text:
+            `Your NextGen Vault email verification OTP is ${otp}. It expires in 5 minutes.`,
+
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px">
+              <div style="border:1px solid #e2e8f0;border-radius:14px;padding:28px">
+                <h2 style="margin-top:0;color:#0f172a">NextGen Vault</h2>
+
+                <p style="color:#475569">
+                  Use this OTP to verify your email address for owner registration.
+                </p>
+
+                <div style="
+                  margin:24px 0;
+                  padding:18px;
+                  background:#f1f5f9;
+                  border-radius:10px;
+                  text-align:center;
+                  font-size:32px;
+                  letter-spacing:10px;
+                  font-weight:bold;
+                  color:#0f172a;
+                ">
+                  ${otp}
+                </div>
+
+                <p style="color:#64748b">
+                  This OTP expires in <strong>5 minutes</strong>.
+                </p>
+
+                <p style="color:#64748b;font-size:13px">
+                  If you did not request this registration,
+                  you can ignore this email.
+                </p>
+
+              </div>
+            </div>
+          `,
         });
+
+      } catch (mailError) {
+
+        await RegistrationEmailVerification.deleteOne({
+          email,
+        });
+
+
+        console.error(
+          'Registration email OTP send error:',
+          mailError
+        );
+
+
+        return res
+          .status(500)
+          .json({
+            message:
+              'Unable to send the email OTP. Please check the email configuration and try again.',
+          });
+      }
     }
 
 
@@ -878,9 +911,14 @@ export async function requestRegistrationEmailOTP(
       .status(200)
       .json({
         message:
-          'OTP sent to your email address.',
+          demoEmailOtpEnabled
+            ? 'Demo email OTP generated. Check the backend terminal for the 6-digit OTP.'
+            : 'OTP sent to your email address.',
 
         email,
+
+        demoMode:
+          demoEmailOtpEnabled,
 
         expiresInSeconds:
           OTP_EXPIRY_MS /
