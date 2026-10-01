@@ -30,7 +30,7 @@ router.post(
 
 /*
 =================================
-GET OWNER DOCUMENTS
+GET USER-OWNED DOCUMENTS
 GET /api/documents
 =================================
 */
@@ -43,7 +43,7 @@ router.get(
 
 /*
 =================================
-GET BENEFICIARY ASSIGNED DOCUMENTS
+GET LEGACY-ALLOCATED DOCUMENTS
 GET /api/documents/assigned-to-me
 =================================
 */
@@ -58,7 +58,7 @@ router.get(
 =================================
 ACCESS SINGLE DOCUMENT
 GET /api/documents/:id/access
-Owner OR explicitly assigned beneficiary
+Owner OR authorized legacy allocation recipient
 =================================
 */
 router.get(
@@ -72,7 +72,7 @@ router.get(
 
 /*
 =================================
-DELETE OWNER DOCUMENT
+DELETE USER-OWNED DOCUMENT
 DELETE /api/documents/:id
 =================================
 */
