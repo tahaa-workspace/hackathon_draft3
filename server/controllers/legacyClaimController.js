@@ -5,6 +5,7 @@ import streamifier from 'streamifier';
 import LegacyClaim from '../models/LegacyClaim.js';
 import User from '../models/User.js';
 import Document from '../models/Document.js';
+import LegacyAllocation from '../models/LegacyAllocation.js';
 
 /*
 |--------------------------------------------------------------------------
@@ -930,44 +931,51 @@ export async function createLegacyClaim(
   req,
   res
 ) {
-  const beneficiary =
-    await User.findById(
-      req.user.id
-    ).select(
-      'role createdBy name username email'
-    );
+  const allocationId = String(req.body?.allocationId || '').trim();
 
-  if (
-    !beneficiary ||
-    beneficiary.role !==
-      'BENEFICIARY' ||
-    !beneficiary.createdBy
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'This beneficiary account is not linked to an owner.',
-      });
+  if (!allocationId) {
+    return res.status(400).json({
+      message: 'Select a legacy allocation before submitting a claim.',
+    });
   }
 
-  const owner =
-    await User.findById(
-      beneficiary.createdBy
-    ).select(
-      'name username email role status'
-    );
+  const allocation = await LegacyAllocation.findOne({
+    _id: allocationId,
+    allocatedTo: req.user.id,
+    status: { $in: ['ACTIVE', 'PENDING', 'RELEASED'] },
+  })
+    .populate('allocatedBy', 'name username email role status')
+    .populate('assetId', 'title recordType ownerId');
 
-  if (
-    !owner ||
-    owner.role !== 'OWNER'
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'Linked owner account could not be found.',
-      });
+  if (!allocation) {
+    return res.status(404).json({
+      message: 'Legacy allocation not found or you are not its recipient.',
+    });
+  }
+
+  if (allocation.releaseCondition === 'DATE' &&
+      allocation.releaseDate &&
+      new Date(allocation.releaseDate) > new Date()) {
+    return res.status(400).json({
+      message: 'This allocation is not yet eligible for a legacy access claim.',
+    });
+  }
+
+  const beneficiary = await User.findById(req.user.id)
+    .select('role name username email');
+
+  if (!beneficiary || beneficiary.role !== 'USER') {
+    return res.status(403).json({
+      message: 'Only a normal user can claim an incoming legacy allocation.',
+    });
+  }
+
+  const owner = allocation.allocatedBy;
+
+  if (!owner || owner.status !== 'ACTIVE') {
+    return res.status(400).json({
+      message: 'The allocating user account is unavailable.',
+    });
   }
 
   const deathFile =
@@ -1010,33 +1018,9 @@ export async function createLegacyClaim(
       });
   }
 
-  const assignedCount =
-    await Document.countDocuments({
-      ownerId:
-        owner._id,
-
-      assignedBeneficiaries:
-        beneficiary._id,
-    });
-
-  if (
-    assignedCount === 0
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'No Owner-assigned records exist for this beneficiary, so a Legacy Access Claim cannot be created yet.',
-      });
-  }
-
   const existing =
     await LegacyClaim.findOne({
-      ownerId:
-        owner._id,
-
-      beneficiaryId:
-        beneficiary._id,
+      allocationId: allocation._id,
 
       status: {
         $in: [
@@ -1055,7 +1039,7 @@ export async function createLegacyClaim(
       .status(409)
       .json({
         message:
-          'A Legacy Access Claim already exists for this Owner-Beneficiary relationship.',
+          'A Legacy Access Claim already exists for this allocation.',
       });
   }
 
@@ -1155,6 +1139,12 @@ export async function createLegacyClaim(
 
     const claim =
       await LegacyClaim.create({
+        allocationId:
+          allocation._id,
+
+        claimantId:
+          beneficiary._id,
+
         ownerId:
           owner._id,
 
