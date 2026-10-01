@@ -116,13 +116,34 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2 sm:gap-3">
           {user.role === 'USER' && (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/legacy-access')}
+                className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
+              >
+                <Archive size={16} />
+                Legacy Access
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/legal-assistance')}
+                className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-white px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 xl:inline-flex"
+              >
+                <Briefcase size={16} />
+                Legal Assistance
+              </button>
+            </>
+          )}
+
+          {user.role === 'LAWYER' && (
             <button
               type="button"
-              onClick={() => navigate('/legacy-access')}
+              onClick={() => navigate('/lawyer/consultations')}
               className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
             >
-              <Archive size={16} />
-              Legacy Access
+              <Briefcase size={16} />
+              Consultations
             </button>
           )}
 
@@ -245,8 +266,18 @@ export default function Navbar() {
             <LayoutDashboard size={14} /> Dashboard
           </button>
           {user.role === 'USER' && (
-            <button type="button" onClick={() => navigate('/legacy-access')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
-              <Archive size={14} /> Legacy Access
+            <>
+              <button type="button" onClick={() => navigate('/legacy-access')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+                <Archive size={14} /> Legacy Access
+              </button>
+              <button type="button" onClick={() => navigate('/legal-assistance')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+                <Briefcase size={14} /> Legal Assistance
+              </button>
+            </>
+          )}
+          {user.role === 'LAWYER' && (
+            <button type="button" onClick={() => navigate('/lawyer/consultations')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+              <Briefcase size={14} /> Consultations
             </button>
           )}
         </div>
