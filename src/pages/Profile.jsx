@@ -245,7 +245,7 @@ export default function Profile() {
                   <Privilege
                     icon={LockKeyhole}
                     title="Scoped access"
-                    description="Legal review access is limited to assigned claims and does not provide unrestricted access to Owner vault records."
+                    description="Legal review access is limited to assigned claims and does not provide unrestricted access to private user vault records."
                   />
                 </div>
               </ProfileInfoCard>
@@ -297,7 +297,7 @@ export default function Profile() {
                       <p className="mt-1 max-w-xl text-xs leading-5 text-red-700">
                         This cannot be undone. Stored identity files and account-owned data are removed from Cloudinary and MongoDB Atlas.
                         {user.role === 'USER'
-                          ? ' Beneficiary accounts created by this Owner are deleted as part of the cascade.'
+                          ? ' Related allocations and claims are deleted as part of the account cleanup.'
                           : ''}
                       </p>
                     </div>
