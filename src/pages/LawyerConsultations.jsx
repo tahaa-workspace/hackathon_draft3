@@ -29,7 +29,7 @@ export default function LawyerConsultations() {
   }, [refresh]);
 
   const update = async (request, status) => {
-    const remarks = window.prompt('Optional remarks for the user:', request.lawyerRemarks || '') ?? request.lawyerRemarks || '';
+    const remarks = (window.prompt('Optional remarks for the user:', request.lawyerRemarks || '') ?? request.lawyerRemarks) || '';
     setBusyId(request.id);
     setMessage('');
 
