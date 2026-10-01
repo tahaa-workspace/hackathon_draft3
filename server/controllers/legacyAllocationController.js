@@ -53,7 +53,8 @@ export async function searchAllocationUsers(req, res) {
   const q = String(req.query.q || '').trim();
   if (q.length < 2) return res.status(200).json({ users: [] });
 
-  const pattern = new RegExp(q, 'i');
+  const escaped = q.replace(/[.*+?^$()|[\]\\{}]/g, '\\  const pattern = new RegExp(q, 'i');');
+  const pattern = new RegExp(escaped, 'i');
   const users = await User.find({
     _id: { $ne: req.user.id },
     role: 'USER',
