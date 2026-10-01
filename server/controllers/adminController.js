@@ -77,16 +77,7 @@ function registrationPayload(user) {
 }
 
 
-function accountPayload(
-  user,
-  allocationRecipientCounts = new Map()
-) {
-  const creator =
-    user.createdBy &&
-    typeof user.createdBy === 'object'
-      ? user.createdBy
-      : null;
-
+function accountPayload(user) {
   return {
     id: user._id.toString(),
     name: user.name,
@@ -94,59 +85,17 @@ function accountPayload(
     email: user.email,
     role: user.role,
     status: user.status,
-    mustChangePassword:
-      user.mustChangePassword,
-    createdAt:
-      user.createdAt,
-    updatedAt:
-      user.updatedAt,
-
-    allocationRecipientCount:
-      user.role === 'USER'
-        ? (
-            allocationRecipientCounts.get(
-              user._id.toString()
-            ) || 0
-          )
-        : 0,
-
-    user:
-      user.role === 'USER' &&
-      creator
-        ? {
-            id:
-              creator._id.toString(),
-            name:
-              creator.name,
-            username:
-              creator.username,
-            email:
-              creator.email,
-          }
-        : null,
-
+    mustChangePassword: user.mustChangePassword,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
     lawyerProfile:
       user.role === 'LAWYER'
         ? {
-            phone:
-              user.lawyerProfile?.phone ||
-              null,
-
-            city:
-              user.lawyerProfile?.city ||
-              null,
-
-            state:
-              user.lawyerProfile?.state ||
-              null,
-
-            enrollmentNumber:
-              user.lawyerProfile?.enrollmentNumber ||
-              null,
-
-            stateBarCouncil:
-              user.lawyerProfile?.stateBarCouncil ||
-              null,
+            phone: user.lawyerProfile?.phone || null,
+            city: user.lawyerProfile?.city || null,
+            state: user.lawyerProfile?.state || null,
+            enrollmentNumber: user.lawyerProfile?.enrollmentNumber || null,
+            stateBarCouncil: user.lawyerProfile?.stateBarCouncil || null,
           }
         : null,
   };
@@ -236,137 +185,31 @@ export async function listUsers(
   res
 ) {
   try {
-    const users =
-      await User.find({
-        role: {
-          $in: [
-            'USER',
-            'USER',
-            'LAWYER',
-          ],
-        },
-      })
-        .populate(
-          'createdBy',
-          'name username email'
-        )
-        .sort({
-          createdAt: -1,
-        })
-        .select(
-          '-passwordHash'
-        );
+    const users = await User.find({
+      role: { $in: ['USER', 'LAWYER'] },
+    })
+      .sort({ createdAt: -1 })
+      .select('-passwordHash');
 
-    const allocationRecipientCounts =
-      new Map();
+    const accounts = users.map(accountPayload);
 
-    users.forEach(
-      (user) => {
-        if (
-          user.role !==
-            'USER' ||
-          !user.createdBy?._id
-        ) {
-          return;
-        }
-
-        const userId =
-          user.createdBy._id
-            .toString();
-
-        allocationRecipientCounts.set(
-          userId,
-          (
-            allocationRecipientCounts.get(
-              userId
-            ) || 0
-          ) + 1
-        );
-      }
-    );
-
-    const accounts =
-      users.map(
-        (user) =>
-          accountPayload(
-            user,
-            allocationRecipientCounts
-          )
-      );
-
-    return res
-      .status(200)
-      .json({
-        count:
-          accounts.length,
-
-        summary: {
-          users:
-            accounts.filter(
-              (user) =>
-                user.role ===
-                'USER'
-            ).length,
-
-          beneficiaries:
-            accounts.filter(
-              (user) =>
-                user.role ===
-                'USER'
-            ).length,
-
-          lawyers:
-            accounts.filter(
-              (user) =>
-                user.role ===
-                'LAWYER'
-            ).length,
-
-          active:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'ACTIVE'
-            ).length,
-
-          suspended:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'SUSPENDED'
-            ).length,
-
-          pending:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'PENDING'
-            ).length,
-
-          rejected:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'REJECTED'
-            ).length,
-        },
-
-        users:
-          accounts,
-      });
-
+    return res.status(200).json({
+      count: accounts.length,
+      summary: {
+        users: accounts.filter((user) => user.role === 'USER').length,
+        lawyers: accounts.filter((user) => user.role === 'LAWYER').length,
+        active: accounts.filter((user) => user.status === 'ACTIVE').length,
+        suspended: accounts.filter((user) => user.status === 'SUSPENDED').length,
+        pending: accounts.filter((user) => user.status === 'PENDING').length,
+        rejected: accounts.filter((user) => user.status === 'REJECTED').length,
+      },
+      users: accounts,
+    });
   } catch (error) {
-    console.error(
-      'List users error:',
-      error
-    );
-
-    return res
-      .status(500)
-      .json({
-        message:
-          'Unable to fetch users.',
-      });
+    console.error('Admin list users error:', error);
+    return res.status(500).json({
+      message: 'Failed to load platform users.',
+    });
   }
 }
 
