@@ -24,7 +24,7 @@ POST /api/documents
 router.post(
     "/",
     protect,
-    authorize("OWNER"),
+    authorize("USER"),
     upload.single("file"),
     uploadDocument
 );
@@ -38,7 +38,7 @@ GET /api/documents
 router.get(
     "/",
     protect,
-    authorize("OWNER"),
+    authorize("USER"),
     getDocuments
 );
 
@@ -51,7 +51,7 @@ GET /api/documents/assigned-to-me
 router.get(
     "/assigned-to-me",
     protect,
-    authorize("BENEFICIARY"),
+    authorize("USER"),
     getAssignedDocuments
 );
 
@@ -64,7 +64,7 @@ PUT /api/documents/:id/beneficiaries
 router.put(
     "/:id/beneficiaries",
     protect,
-    authorize("OWNER"),
+    authorize("USER"),
     updateDocumentBeneficiaries
 );
 
@@ -78,7 +78,7 @@ Owner OR explicitly assigned beneficiary
 router.get(
     "/:id/access",
     protect,
-    authorize("OWNER", "BENEFICIARY"),
+    authorize("USER"),
     getDocumentAccessUrl
 );
 
@@ -93,7 +93,7 @@ DELETE /api/documents/:id
 router.delete(
     "/:id",
     protect,
-    authorize("OWNER"),
+    authorize("USER"),
     deleteDocument
 );
 export default router;
