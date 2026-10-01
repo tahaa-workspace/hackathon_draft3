@@ -182,6 +182,12 @@ export async function getAdditionalClaimFile(id, requestId, fileIndex) {
    UNIFIED USER LEGACY ALLOCATIONS
    ========================================================= */
 
+
+
+export async function openDocument(documentId) {
+  return requestBlob('/documents/' + documentId + '/access');
+}
+
 export async function getIncomingAllocations() {
   const data = await request('/legacy-allocations/incoming');
   return data.allocations || [];
