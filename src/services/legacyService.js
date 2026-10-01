@@ -42,6 +42,7 @@ async function requestBlob(path) {
 }
 
 export async function submitLegacyClaim({
+  allocationId,
   identityProofType,
   deathCertificate,
   identityProof,
@@ -49,6 +50,7 @@ export async function submitLegacyClaim({
   remarks,
 }) {
   const formData = new FormData();
+  formData.append('allocationId', allocationId);
   formData.append('identityProofType', identityProofType);
   formData.append('deathCertificate', deathCertificate);
   formData.append('identityProof', identityProof);
@@ -173,4 +175,70 @@ export async function getClaimFileUrl(id, kind) {
 
 export async function getAdditionalClaimFile(id, requestId, fileIndex) {
   return requestBlob(`/legacy-claims/${id}/additional-files/${requestId}/${fileIndex}`);
+}
+
+
+/* =========================================================
+   UNIFIED USER LEGACY ALLOCATIONS
+   ========================================================= */
+
+export async function getIncomingAllocations() {
+  const data = await request('/legacy-allocations/incoming');
+  return data.allocations || [];
+}
+
+export async function getOutgoingAllocations() {
+  const data = await request('/legacy-allocations/outgoing');
+  return data.allocations || [];
+}
+
+export async function searchAllocationUsers(query) {
+  const data = await request(
+    '/legacy-allocations/users/search?q=' + encodeURIComponent(query)
+  );
+  return data.users || [];
+}
+
+export async function createLegacyAllocation(payload) {
+  return request('/legacy-allocations', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function revokeLegacyAllocation(id) {
+  return request('/legacy-allocations/' + id, {
+    method: 'DELETE',
+  });
+}
+
+export async function getNotifications() {
+  const data = await request('/notifications');
+  return data.notifications || [];
+}
+
+export async function getUnreadNotificationCount() {
+  return request('/notifications/unread-count');
+}
+
+export async function markNotificationRead(id) {
+  return request('/notifications/' + id + '/read', {
+    method: 'PATCH',
+  });
+}
+
+export async function markAllNotificationsRead() {
+  return request('/notifications/read-all', {
+    method: 'PATCH',
+  });
+}
+
+export async function getAdminAuditLogs(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== '' && value != null)
+  );
+  const data = await request(
+    '/admin/audit-logs' + (query.toString() ? '?' + query.toString() : '')
+  );
+  return data.logs || [];
 }
