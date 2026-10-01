@@ -4,6 +4,8 @@ import User from '../models/User.js';
 import Document from '../models/Document.js';
 import LegacyClaim from '../models/LegacyClaim.js';
 import BeneficiaryRelationship from '../models/BeneficiaryRelationship.js';
+import LegacyAllocation from '../models/LegacyAllocation.js';
+import Notification from '../models/Notification.js';
 import ForgotPasswordOTP from '../models/ForgotPasswordOTP.js';
 import PasswordChangeOTP from '../models/PasswordChangeOTP.js';
 import ProfileContactVerification from '../models/ProfileContactVerification.js';
@@ -177,24 +179,8 @@ export async function deleteAccountCascade(targetUserId) {
     throw error;
   }
 
-  let usersToDelete = [target];
-
-  if (target.role === 'OWNER') {
-    const ownedBeneficiaries = await User.find({
-      role: 'BENEFICIARY',
-      createdBy: target._id,
-    });
-
-    usersToDelete = [target, ...ownedBeneficiaries];
-  }
-
-  const userIds = uniqueIds(usersToDelete.map((user) => user._id));
-
-  const beneficiaryIds = uniqueIds(
-    usersToDelete
-      .filter((user) => user.role === 'BENEFICIARY')
-      .map((user) => user._id)
-  );
+  const usersToDelete = [target];
+  const userIds = [target._id.toString()];
 
   const emails = [
     ...new Set(
@@ -215,21 +201,20 @@ export async function deleteAccountCascade(targetUserId) {
   ];
 
   const ownedDocuments =
-    target.role === 'OWNER'
+    target.role === 'USER'
       ? await Document.find({ ownerId: target._id })
       : [];
 
   const claimQuery =
-    target.role === 'OWNER'
+    target.role === 'USER'
       ? {
           $or: [
             { ownerId: target._id },
-            { beneficiaryId: { $in: beneficiaryIds } },
+            { beneficiaryId: target._id },
+            { claimantId: target._id },
           ],
         }
-      : target.role === 'BENEFICIARY'
-        ? { beneficiaryId: target._id }
-        : null;
+      : null;
 
   const claimsToDelete = claimQuery
     ? await LegacyClaim.find(claimQuery)
@@ -298,6 +283,21 @@ export async function deleteAccountCascade(targetUserId) {
             { beneficiaryId: { $in: userIds } },
           ],
         },
+        { session }
+      );
+
+      await LegacyAllocation.deleteMany(
+        {
+          $or: [
+            { allocatedBy: { $in: userIds } },
+            { allocatedTo: { $in: userIds } },
+          ],
+        },
+        { session }
+      );
+
+      await Notification.deleteMany(
+        { recipientId: { $in: userIds } },
         { session }
       );
 
