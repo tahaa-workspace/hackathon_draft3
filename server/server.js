@@ -12,6 +12,7 @@ import profileRoutes from './routes/profileRoutes.js';
 import legacyAllocationRoutes from './routes/legacyAllocationRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import auditRoutes from './routes/auditRoutes.js';
+import legalRequestRoutes from './routes/legalRequestRoutes.js';
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/legacy-allocations', legacyAllocationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin/audit-logs', auditRoutes);
+app.use('/api/legal-requests', legalRequestRoutes);
 app.use('/api/contact', contactRoutes);
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found.' });
