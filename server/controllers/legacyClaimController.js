@@ -512,6 +512,16 @@ function claimPayload(claim) {
     id:
       claim._id.toString(),
 
+    allocationId:
+      claim.allocationId?._id?.toString?.() ||
+      claim.allocationId?.toString?.() ||
+      null,
+
+    claimantId:
+      claim.claimantId?._id?.toString?.() ||
+      claim.claimantId?.toString?.() ||
+      null,
+
     owner:
       personPayload(owner),
 
@@ -584,6 +594,14 @@ function claimPayload(claim) {
 
 async function populatedClaim(query) {
   return query
+    .populate(
+      'allocationId',
+      'assetId allocatedBy allocatedTo status releaseCondition releaseDate permissions'
+    )
+    .populate(
+      'claimantId',
+      'name username email role'
+    )
     .populate(
       'ownerId',
       'name username email role'
