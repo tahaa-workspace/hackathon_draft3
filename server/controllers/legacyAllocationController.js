@@ -117,6 +117,18 @@ export async function createLegacyAllocation(req, res) {
       return res.status(400).json({ message: 'releaseDate is required for DATE-based release.' });
     }
 
+    const existingAllocation = await LegacyAllocation.exists({
+      assetId: asset._id,
+      allocatedTo: recipient._id,
+      status: { $ne: 'REVOKED' },
+    });
+
+    if (existingAllocation) {
+      return res.status(409).json({
+        message: 'This user already has an active allocation for this asset.',
+      });
+    }
+
     const allocation = await LegacyAllocation.create({
       assetId: asset._id,
       allocatedBy: req.user.id,
