@@ -5,6 +5,7 @@ import LegacyClaim from "../models/LegacyClaim.js";
 import LegacyAllocation from "../models/LegacyAllocation.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import { writeAudit } from "../services/auditService.js";
 
 const RECORD_TYPES = ["GENERAL", "ASSET", "LIABILITY"];
 
@@ -228,6 +229,14 @@ export const uploadDocument = async (req, res) => {
             },
         });
 
+        await writeAudit(req, {
+            action: "ASSET_CREATED",
+            entityType: "Document",
+            entityId: document._id,
+            description: "Encrypted vault record created.",
+            metadata: { recordType: document.recordType, category: document.category },
+        });
+
         return res.status(201).json({
             message: "Vault record encrypted and uploaded securely.",
             document: documentPayload(document),
@@ -432,6 +441,15 @@ export const getDocumentAccessUrl = async (req, res) => {
             `inline; filename*=UTF-8''${encodeURIComponent(document.originalName)}`
         );
 
+        await writeAudit(req, {
+            action: "ASSET_VIEWED",
+            entityType: "Document",
+            entityId: document._id,
+            description: isOwner
+                ? "User viewed an owned encrypted vault record."
+                : "Allocation recipient viewed an unlocked legacy asset.",
+        });
+
         return res.status(200).send(originalFile);
     } catch (error) {
         console.error("Document access error:", error);
@@ -557,6 +575,13 @@ export const deleteDocument = async (req, res) => {
         await Document.deleteOne({
             _id: document._id,
             ownerId: req.user.id,
+        });
+
+        await writeAudit(req, {
+            action: "ASSET_DELETED",
+            entityType: "Document",
+            entityId: document._id,
+            description: "Owned encrypted vault record permanently deleted.",
         });
 
         return res.status(200).json({
