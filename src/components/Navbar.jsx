@@ -1,35 +1,51 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield,
-  User,
-  Users,
-  LogOut,
+  Archive,
+  Bell,
+  Briefcase,
+  ChevronRight,
+  FileSearch2,
+  Home,
   KeyRound,
   LayoutDashboard,
-  Home,
-  ChevronRight,
-  Briefcase,
-  Scale,
-  FolderLock,
+  LogOut,
+  Shield,
+  User,
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import { homeForRole } from './ProtectedRoute';
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+} from '../services/legacyService';
 
 const ROLE_META = {
   ADMIN: { label: 'Administrator', Icon: Shield },
-  OWNER: { label: 'Owner', Icon: User },
-  BENEFICIARY: { label: 'Beneficiary', Icon: Users },
+  USER: { label: 'User', Icon: User },
   LAWYER: { label: 'Lawyer', Icon: Briefcase },
 };
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [unread, setUnread] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [recent, setRecent] = useState([]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    getUnreadNotificationCount()
+      .then((data) => setUnread(data.count || 0))
+      .catch(() => {});
+  }, [user]);
 
   if (!user) return null;
 
-  const meta = ROLE_META[user.role] || ROLE_META.BENEFICIARY;
+  const meta = ROLE_META[user.role] || ROLE_META.USER;
   const RoleIcon = meta.Icon;
 
   const handleLogout = () => {
@@ -37,23 +53,50 @@ export default function Navbar() {
     navigate('/', { replace: true });
   };
 
-  const goToDashboard = () => navigate(homeForRole(user.role));
-  const goToHome = () => navigate('/');
-  const goToPassword = () => navigate('/change-password');
-  const goToLegacyClaims = () => navigate('/admin/legacy-claims');
-  const goToOwnerVault = () => navigate('/owner/vault');
+  const toggleNotifications = async () => {
+    const next = !notificationOpen;
+    setNotificationOpen(next);
+    if (next) {
+      try {
+        setRecent((await getNotifications()).slice(0, 5));
+      } catch {
+        setRecent([]);
+      }
+    }
+  };
+
+  const openNotification = async (item) => {
+    if (!item.isRead) {
+      try {
+        await markNotificationRead(item.id);
+        setUnread((count) => Math.max(0, count - 1));
+        setRecent((items) =>
+          items.map((entry) =>
+            entry.id === item.id ? { ...entry, isRead: true } : entry
+          )
+        );
+      } catch {}
+    }
+
+    setNotificationOpen(false);
+
+    if (item.type === 'LEGACY_ALLOCATION' || item.type === 'LEGACY_RELEASE') {
+      navigate('/legacy-access');
+      return;
+    }
+
+    navigate('/notifications');
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/90 shadow-[0_8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl">
       <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Brand */}
         <button
           type="button"
-          onClick={goToHome}
-          className="group flex items-center gap-3 rounded-xl px-1 py-1 text-left transition duration-200 hover:-translate-y-0.5"
-          title="Go to home"
+          onClick={() => navigate('/')}
+          className="group flex items-center gap-3 rounded-xl px-1 py-1 text-left"
         >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-ink-100 transition duration-200 group-hover:scale-105 group-hover:shadow-lg">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-ink-100">
             <img
               src="/nextgen-vault-logo.png"
               alt="NextGen Vault"
@@ -62,172 +105,150 @@ export default function Navbar() {
           </div>
 
           <div className="hidden flex-col leading-tight sm:flex">
-            <span className="text-[15px] font-bold tracking-[-0.02em] text-ink-900 transition group-hover:text-brand-700">
+            <span className="text-[15px] font-bold tracking-[-0.02em] text-ink-900">
               NextGen Vault
             </span>
-
             <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">
               Digital Asset Custody
             </span>
           </div>
         </button>
 
-        {/* Right navigation */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {user.role === 'USER' && (
+            <button
+              type="button"
+              onClick={() => navigate('/legacy-access')}
+              className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
+            >
+              <Archive size={16} />
+              Legacy Access
+            </button>
+          )}
+
           {user.role === 'ADMIN' && (
             <button
               type="button"
-              onClick={goToLegacyClaims}
-              className="group hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
+              onClick={() => navigate('/admin/audit-logs')}
+              className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
             >
-              <Scale size={16} />
-              Legacy Claims
+              <FileSearch2 size={16} />
+              Audit Logs
             </button>
           )}
 
-          {user.role === 'OWNER' && (
+          <div className="relative">
             <button
               type="button"
-              onClick={goToOwnerVault}
-              className="group hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
+              onClick={toggleNotifications}
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-ink-100 bg-white text-ink-600 shadow-sm transition hover:bg-brand-50 hover:text-brand-700"
+              title="Notifications"
             >
-              <FolderLock size={16} />
-              My Vault
+              <Bell size={17} />
+              {unread > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold leading-[18px] text-white">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
             </button>
-          )}
+
+            {notificationOpen && (
+              <div className="absolute right-0 top-12 z-50 w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <p className="font-semibold text-slate-900">Notifications</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotificationOpen(false);
+                      navigate('/notifications');
+                    }}
+                    className="text-xs font-semibold text-indigo-600"
+                  >
+                    View all
+                  </button>
+                </div>
+
+                {recent.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm text-slate-400">
+                    No notifications yet.
+                  </p>
+                ) : (
+                  <div className="max-h-96 divide-y divide-slate-100 overflow-auto">
+                    {recent.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => openNotification(item)}
+                        className={"block w-full px-4 py-3 text-left hover:bg-slate-50 " + (!item.isRead ? "bg-indigo-50/50" : "")}
+                      >
+                        <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.message}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
-            onClick={goToDashboard}
-            className="group hidden items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition duration-200 hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-lg md:inline-flex"
+            onClick={() => navigate(homeForRole(user.role))}
+            className="group hidden items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-brand-700 md:inline-flex"
           >
-            <LayoutDashboard
-              size={16}
-              className="transition group-hover:scale-110"
-            />
-
+            <LayoutDashboard size={16} />
             Dashboard
-
-            <ChevronRight
-              size={15}
-              className="transition duration-200 group-hover:translate-x-0.5"
-            />
-          </button>
-
-          <button
-            type="button"
-            onClick={goToDashboard}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm transition hover:scale-105 hover:bg-brand-700 md:hidden"
-            title="Dashboard"
-          >
-            <LayoutDashboard size={17} />
+            <ChevronRight size={15} />
           </button>
 
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="group hidden items-center gap-3 rounded-xl border border-ink-100 bg-white px-3 py-2 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50/60 hover:shadow-md sm:flex"
+            className="group hidden items-center gap-3 rounded-xl border border-ink-100 bg-white px-3 py-2 text-left shadow-sm sm:flex"
             title="Open profile"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-50 text-brand-700 transition duration-200 group-hover:scale-105 group-hover:bg-brand-100">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-50 text-brand-700">
               <RoleIcon size={15} />
             </div>
-
             <div className="min-w-0 leading-tight">
-              <p className="text-xs font-semibold text-ink-800 transition group-hover:text-brand-800">
-                {meta.label}
-              </p>
-
-              <p className="max-w-[130px] truncate text-xs text-ink-400 transition group-hover:text-brand-600">
-                @{user.username}
-              </p>
+              <p className="text-xs font-semibold text-ink-800">{meta.label}</p>
+              <p className="max-w-[130px] truncate text-xs text-ink-400">@{user.username}</p>
             </div>
           </button>
 
           <button
             type="button"
-            onClick={goToPassword}
-            className="group inline-flex items-center gap-2 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-ink-600 transition duration-200 hover:-translate-y-0.5 hover:border-ink-100 hover:bg-white hover:text-ink-900 hover:shadow-sm"
-            title="Change password"
+            onClick={() => navigate('/change-password')}
+            className="hidden items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-600 hover:bg-ink-50 lg:inline-flex"
           >
-            <KeyRound
-              size={16}
-              className="transition group-hover:scale-110"
-            />
-
-            <span className="hidden lg:inline">
-              Password
-            </span>
+            <KeyRound size={16} />
+            Password
           </button>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="group inline-flex items-center gap-2 rounded-xl bg-ink-50 px-3 py-2.5 text-sm font-medium text-ink-600 transition duration-200 hover:-translate-y-0.5 hover:bg-red-50 hover:text-red-600 hover:shadow-sm"
+            className="inline-flex items-center gap-2 rounded-xl bg-ink-50 px-3 py-2.5 text-sm font-medium text-ink-600 transition hover:bg-red-50 hover:text-red-600"
           >
-            <LogOut
-              size={16}
-              className="transition group-hover:translate-x-0.5"
-            />
-
-            <span className="hidden lg:inline">
-              Sign out
-            </span>
+            <LogOut size={16} />
+            <span className="hidden lg:inline">Sign out</span>
           </button>
         </div>
       </div>
 
-      {/* Mobile navigation */}
       <div className="border-t border-ink-100 bg-white/70 md:hidden">
         <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-2 sm:px-6">
-          <button
-            type="button"
-            onClick={goToHome}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
-          >
-            <Home size={14} />
-            Home
+          <button type="button" onClick={() => navigate('/')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+            <Home size={14} /> Home
           </button>
-
-          <button
-            type="button"
-            onClick={goToDashboard}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
-          >
-            <LayoutDashboard size={14} />
-            Dashboard
+          <button type="button" onClick={() => navigate(homeForRole(user.role))} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+            <LayoutDashboard size={14} /> Dashboard
           </button>
-
-          {user.role === 'ADMIN' && (
-            <button
-              type="button"
-              onClick={goToLegacyClaims}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
-            >
-              <Scale size={14} />
-              Legacy Claims
+          {user.role === 'USER' && (
+            <button type="button" onClick={() => navigate('/legacy-access')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+              <Archive size={14} /> Legacy Access
             </button>
           )}
-
-          {user.role === 'OWNER' && (
-            <button
-              type="button"
-              onClick={goToOwnerVault}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
-            >
-              <FolderLock size={14} />
-              My Vault
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={goToPassword}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600 transition hover:bg-ink-50 hover:text-brand-700"
-          >
-            <KeyRound size={14} />
-            Password
-          </button>
         </div>
       </div>
     </header>
