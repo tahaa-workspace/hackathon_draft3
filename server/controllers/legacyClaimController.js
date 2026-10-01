@@ -620,7 +620,7 @@ async function populatedClaim(query) {
 
 /*
 |--------------------------------------------------------------------------
-| OWNER RECORD PAYLOAD
+| ALLOCATED RECORD PAYLOAD
 |--------------------------------------------------------------------------
 */
 
@@ -834,7 +834,7 @@ async function deleteStoredClaimFile(
 
 /*
 |--------------------------------------------------------------------------
-| DELETE ALL BENEFICIARY-UPLOADED CLAIM FILES
+| DELETE ALL CLAIMANT-UPLOADED CLAIM FILES
 |--------------------------------------------------------------------------
 */
 
@@ -1273,7 +1273,7 @@ export async function createLegacyClaim(
 
 /*
 |--------------------------------------------------------------------------
-| BENEFICIARY CLAIM LIST
+| CLAIMANT CLAIM LIST
 |--------------------------------------------------------------------------
 */
 
@@ -1487,7 +1487,7 @@ export async function adminReviewClaim(
 
   /*
   |--------------------------------------------------------------------------
-  | DELETE ALL BENEFICIARY LEGACY CLAIM FILES
+  | DELETE ALL CLAIMANT LEGACY CLAIM FILES
   |--------------------------------------------------------------------------
   */
 
