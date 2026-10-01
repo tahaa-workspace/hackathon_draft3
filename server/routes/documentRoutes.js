@@ -4,7 +4,6 @@ import {
     uploadDocument,
     getDocuments,
     getAssignedDocuments,
-    updateDocumentBeneficiaries,
     getDocumentAccessUrl,
     deleteDocument,
 } from "../controllers/documentController.js";
@@ -53,19 +52,6 @@ router.get(
     protect,
     authorize("USER"),
     getAssignedDocuments
-);
-
-/*
-=================================
-UPDATE DOCUMENT BENEFICIARIES
-PUT /api/documents/:id/beneficiaries
-=================================
-*/
-router.put(
-    "/:id/beneficiaries",
-    protect,
-    authorize("USER"),
-    updateDocumentBeneficiaries
 );
 
 /*
