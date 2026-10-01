@@ -52,9 +52,6 @@ const legacyAllocationSchema = new Schema(
   { timestamps: true }
 );
 
-legacyAllocationSchema.index(
-  { assetId: 1, allocatedTo: 1 },
-  { unique: true, partialFilterExpression: { status: { $ne: 'REVOKED' } } }
-);
+legacyAllocationSchema.index({ assetId: 1, allocatedTo: 1, status: 1 });
 
 export default mongoose.model('LegacyAllocation', legacyAllocationSchema);
