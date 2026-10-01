@@ -79,7 +79,7 @@ function registrationPayload(user) {
 
 function accountPayload(
   user,
-  beneficiaryCounts = new Map()
+  allocationRecipientCounts = new Map()
 ) {
   const creator =
     user.createdBy &&
@@ -101,17 +101,17 @@ function accountPayload(
     updatedAt:
       user.updatedAt,
 
-    beneficiaryCount:
-      user.role === 'OWNER'
+    allocationRecipientCount:
+      user.role === 'USER'
         ? (
-            beneficiaryCounts.get(
+            allocationRecipientCounts.get(
               user._id.toString()
             ) || 0
           )
         : 0,
 
-    owner:
-      user.role === 'BENEFICIARY' &&
+    user:
+      user.role === 'USER' &&
       creator
         ? {
             id:
@@ -169,7 +169,7 @@ export async function listPendingRegistrations(
         status: 'PENDING',
         role: {
           $in: [
-            'OWNER',
+            'USER',
             'LAWYER',
           ],
         },
@@ -188,11 +188,11 @@ export async function listPendingRegistrations(
           pending.length,
 
         summary: {
-          owners:
+          users:
             pending.filter(
               (user) =>
                 user.role ===
-                'OWNER'
+                'USER'
             ).length,
 
           lawyers:
@@ -240,8 +240,8 @@ export async function listUsers(
       await User.find({
         role: {
           $in: [
-            'OWNER',
-            'BENEFICIARY',
+            'USER',
+            'USER',
             'LAWYER',
           ],
         },
@@ -257,28 +257,28 @@ export async function listUsers(
           '-passwordHash'
         );
 
-    const beneficiaryCounts =
+    const allocationRecipientCounts =
       new Map();
 
     users.forEach(
       (user) => {
         if (
           user.role !==
-            'BENEFICIARY' ||
+            'USER' ||
           !user.createdBy?._id
         ) {
           return;
         }
 
-        const ownerId =
+        const userId =
           user.createdBy._id
             .toString();
 
-        beneficiaryCounts.set(
-          ownerId,
+        allocationRecipientCounts.set(
+          userId,
           (
-            beneficiaryCounts.get(
-              ownerId
+            allocationRecipientCounts.get(
+              userId
             ) || 0
           ) + 1
         );
@@ -290,7 +290,7 @@ export async function listUsers(
         (user) =>
           accountPayload(
             user,
-            beneficiaryCounts
+            allocationRecipientCounts
           )
       );
 
@@ -301,18 +301,18 @@ export async function listUsers(
           accounts.length,
 
         summary: {
-          owners:
+          users:
             accounts.filter(
               (user) =>
                 user.role ===
-                'OWNER'
+                'USER'
             ).length,
 
           beneficiaries:
             accounts.filter(
               (user) =>
                 user.role ===
-                'BENEFICIARY'
+                'USER'
             ).length,
 
           lawyers:
@@ -422,8 +422,8 @@ export async function updateUserStatus(
 
     if (
       ![
-        'OWNER',
-        'BENEFICIARY',
+        'USER',
+        'USER',
         'LAWYER',
       ].includes(
         user.role
@@ -521,13 +521,13 @@ export async function getAadhaarReviewUrl(
     if (
       !user ||
       user.role !==
-        'OWNER'
+        'USER'
     ) {
       return res
         .status(404)
         .json({
           message:
-            'Owner registration not found.',
+            'User registration not found.',
         });
     }
 
@@ -867,7 +867,7 @@ export async function approveUser(
 
     if (
       user.role ===
-        'OWNER' &&
+        'USER' &&
       !user.aadhaarDocument
         ?.publicId
     ) {
@@ -875,7 +875,7 @@ export async function approveUser(
         .status(400)
         .json({
           message:
-            'Owner registration is missing its Aadhaar verification document.',
+            'User registration is missing its Aadhaar verification document.',
         });
     }
 
@@ -896,7 +896,7 @@ export async function approveUser(
 
     if (
       ![
-        'OWNER',
+        'USER',
         'LAWYER',
       ].includes(
         user.role
@@ -933,7 +933,7 @@ export async function approveUser(
           user.role ===
           'LAWYER'
             ? 'Lawyer approved. The professional account is now active.'
-            : 'Owner approved. They may now log in.',
+            : 'User approved. They may now log in.',
 
         user:
           registrationPayload(
@@ -1005,7 +1005,7 @@ export async function rejectUser(
 
     if (
       ![
-        'OWNER',
+        'USER',
         'LAWYER',
       ].includes(
         user.role
@@ -1023,7 +1023,7 @@ export async function rejectUser(
       user.role ===
       'LAWYER'
         ? 'Lawyer'
-        : 'Owner';
+        : 'User';
 
     const verificationDocument =
       user.role ===
@@ -1041,7 +1041,7 @@ export async function rejectUser(
         ?.resourceType ||
       (
         user.role ===
-        'OWNER'
+        'USER'
           ? 'raw'
           : 'image'
       );
