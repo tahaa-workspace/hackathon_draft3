@@ -853,7 +853,7 @@ export async function requestRegistrationEmailOTP(
                 <h2 style="margin-top:0;color:#0f172a">NextGen Vault</h2>
 
                 <p style="color:#475569">
-                  Use this OTP to verify your email address for owner registration.
+                  Use this OTP to verify your email address for user registration.
                 </p>
 
                 <div style="
@@ -1152,7 +1152,7 @@ export async function verifyRegistrationEmailOTP(
 
 /*
 |--------------------------------------------------------------------------
-| REGISTER OWNER
+| REGISTER USER
 |--------------------------------------------------------------------------
 */
 
@@ -1259,7 +1259,7 @@ export async function registerOwner(
       .status(400)
       .json({
         message:
-          'Aadhaar card image or PDF is required for owner registration.',
+          'Aadhaar card image or PDF is required for user registration.',
       });
   }
 
@@ -1481,7 +1481,7 @@ export async function registerOwner(
     */
 
     console.log(
-      'Encrypted Owner Aadhaar uploaded:',
+      'Encrypted User Aadhaar uploaded:',
       {
         publicId:
           uploadResult.public_id,
@@ -1513,7 +1513,7 @@ export async function registerOwner(
 
     /*
     -----------------------------------------
-    CREATE PENDING OWNER
+    CREATE PENDING USER
     -----------------------------------------
     */
 
@@ -1539,7 +1539,7 @@ export async function registerOwner(
         passwordHash,
 
         role:
-          'OWNER',
+          'USER',
 
         status:
           'PENDING',
@@ -1666,7 +1666,7 @@ export async function registerOwner(
 
 
     console.error(
-      'Owner registration error:',
+      'user registration error:',
       error
     );
 
