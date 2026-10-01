@@ -2,6 +2,7 @@ import crypto from "crypto";
 import Document from "../models/Document.js";
 import User from "../models/User.js";
 import LegacyClaim from "../models/LegacyClaim.js";
+import LegacyAllocation from "../models/LegacyAllocation.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
@@ -330,126 +331,34 @@ export const updateDocumentBeneficiaries = async (req, res) => {
 
 export const getAssignedDocuments = async (req, res) => {
     try {
-        /*
-        =========================================
-        GENERAL DOCUMENTS
-        =========================================
-
-        GENERAL records are available immediately
-        once the Owner has assigned them to this
-        Beneficiary.
-
-        No Legacy Claim is required.
-
-        Older records with no recordType are also
-        treated as GENERAL.
-        */
-
-        const generalDocuments = await Document.find({
-            assignedBeneficiaries: req.user.id,
-
-            $or: [
-                { recordType: "GENERAL" },
-                { recordType: { $exists: false } },
-                { recordType: null },
-            ],
+        const allocations = await LegacyAllocation.find({
+            allocatedTo: req.user.id,
+            status: { $ne: "REVOKED" },
         })
-            .populate("ownerId", "name username")
+            .populate("assetId")
+            .populate("allocatedBy", "name username")
             .sort({ createdAt: -1 });
 
-        /*
-        =========================================
-        APPROVED LEGACY CLAIMS
-        =========================================
+        const documents = allocations
+            .filter((allocation) => allocation.assetId)
+            .map((allocation) => ({
+                ...beneficiaryDocumentPayload({
+                    ...allocation.assetId.toObject(),
+                    ownerId: allocation.allocatedBy,
+                }),
+                allocationId: allocation._id.toString(),
+                allocationStatus: allocation.status,
+                releaseCondition: allocation.releaseCondition,
+                releaseDate: allocation.releaseDate,
+                permissions: allocation.permissions,
+            }));
 
-        ASSET and LIABILITY records are released
-        only for Owners whose Legacy Claim has
-        reached APPROVED_INFORMATION_RELEASED.
-        */
-
-        const approvedClaims = await LegacyClaim.find({
-            beneficiaryId: req.user.id,
-            status: "APPROVED_INFORMATION_RELEASED",
-        }).select("ownerId");
-
-        const releasedOwnerIds = approvedClaims.map(
-            (claim) => claim.ownerId
-        );
-
-        let protectedDocuments = [];
-
-        if (releasedOwnerIds.length > 0) {
-            protectedDocuments = await Document.find({
-                ownerId: {
-                    $in: releasedOwnerIds,
-                },
-
-                assignedBeneficiaries:
-                    req.user.id,
-
-                recordType: {
-                    $in: [
-                        "ASSET",
-                        "LIABILITY",
-                    ],
-                },
-            })
-                .populate(
-                    "ownerId",
-                    "name username"
-                )
-                .sort({
-                    createdAt: -1,
-                });
-        }
-
-        /*
-        =========================================
-        COMBINE BOTH SETS
-        =========================================
-        */
-
-        const documents = [
-            ...generalDocuments,
-            ...protectedDocuments,
-        ];
-
-        /*
-        =========================================
-        SORT NEWEST FIRST
-        =========================================
-        */
-
-        documents.sort(
-            (a, b) =>
-                new Date(b.createdAt) -
-                new Date(a.createdAt)
-        );
-
-        /*
-        =========================================
-        RETURN BENEFICIARY DOCUMENTS
-        =========================================
-        */
-
-        return res.status(200).json({
-            documents: documents.map(
-                beneficiaryDocumentPayload
-            ),
-        });
-
+        return res.status(200).json({ documents });
     } catch (error) {
-        console.error(
-            "Get assigned documents error:",
-            error
-        );
-
+        console.error("Get allocated documents error:", error);
         return res.status(500).json({
-            message:
-                "Failed to fetch assigned documents.",
-
-            error:
-                error.message,
+            message: "Failed to fetch legacy allocations.",
+            error: error.message,
         });
     }
 };
@@ -459,69 +368,44 @@ export const getDocumentAccessUrl = async (req, res) => {
         const document = await Document.findById(req.params.id);
 
         if (!document) {
-            return res.status(404).json({
-                message: "Document not found.",
-            });
+            return res.status(404).json({ message: "Document not found." });
         }
 
-        const isOwner =
-            req.user.role === "OWNER" &&
-            document.ownerId.toString() === req.user.id;
+        const isOwner = document.ownerId.toString() === req.user.id;
+        let allocationAccess = false;
 
-        let beneficiaryHasAccess = false;
+        if (!isOwner && req.user.role === "USER") {
+            const allocation = await LegacyAllocation.findOne({
+                assetId: document._id,
+                allocatedTo: req.user.id,
+                status: { $ne: "REVOKED" },
+            });
 
-        if (req.user.role === "BENEFICIARY") {
-            const isAssigned =
-                (document.assignedBeneficiaries || []).some(
-                    (beneficiaryId) =>
-                        beneficiaryId.toString() === req.user.id
-                );
-
-            if (isAssigned) {
-                const recordType =
-                    document.recordType || "GENERAL";
-
-                if (recordType === "GENERAL") {
-                    beneficiaryHasAccess = true;
+            if (allocation) {
+                if (allocation.releaseCondition === "IMMEDIATE" || allocation.status === "RELEASED") {
+                    allocationAccess = Boolean(allocation.permissions?.view);
                 } else if (
-                    ["ASSET", "LIABILITY"].includes(recordType)
+                    allocation.releaseCondition === "DATE" &&
+                    allocation.releaseDate &&
+                    new Date(allocation.releaseDate) <= new Date()
                 ) {
-                    const approvedClaim =
-                        await LegacyClaim.exists({
-                            ownerId: document.ownerId,
-                            beneficiaryId: req.user.id,
-                            status:
-                                "APPROVED_INFORMATION_RELEASED",
-                        });
-
-                    beneficiaryHasAccess =
-                        Boolean(approvedClaim);
+                    allocationAccess = Boolean(allocation.permissions?.view);
+                } else {
+                    const approvedClaim = await LegacyClaim.exists({
+                        allocationId: allocation._id,
+                        claimantId: req.user.id,
+                        status: "APPROVED_INFORMATION_RELEASED",
+                    });
+                    allocationAccess = Boolean(approvedClaim && allocation.permissions?.view);
                 }
             }
         }
 
-        if (!isOwner && !beneficiaryHasAccess) {
-            const recordType =
-                document.recordType || "GENERAL";
-
-            if (recordType === "GENERAL") {
-                return res.status(403).json({
-                    message:
-                        "You do not have access to this General document.",
-                });
-            }
-
+        if (!isOwner && !allocationAccess) {
             return res.status(403).json({
-                message:
-                    "This Asset or Liability remains locked until the Legacy Access Claim is approved.",
+                message: "This legacy asset is locked until its allocation release conditions are satisfied.",
             });
         }
-
-        /*
-        =========================================
-        VERIFY ENCRYPTED DOCUMENT
-        =========================================
-        */
 
         if (
             document.resourceType !== "raw" ||
@@ -531,80 +415,29 @@ export const getDocumentAccessUrl = async (req, res) => {
             !document.encryption?.authTag
         ) {
             return res.status(409).json({
-                message:
-                    "This document was uploaded before vault encryption was enabled. Please re-upload it securely.",
+                message: "This document was uploaded before vault encryption was enabled. Please re-upload it securely.",
             });
         }
 
-        /*
-        =========================================
-        DOWNLOAD + DECRYPT
-        =========================================
-        */
+        const encryptedBlob = await downloadEncryptedBlob(document);
+        const originalFile = decryptBuffer(encryptedBlob, document.encryption);
 
-        const encryptedBlob =
-            await downloadEncryptedBlob(document);
-
-        const originalFile =
-            decryptBuffer(
-                encryptedBlob,
-                document.encryption
-            );
-
-        /*
-        =========================================
-        STREAM ORIGINAL FILE
-        =========================================
-        */
-
-        res.setHeader(
-            "Content-Type",
-            document.fileType ||
-                "application/octet-stream"
-        );
-
-        res.setHeader(
-            "Content-Length",
-            originalFile.length
-        );
-
-        res.setHeader(
-            "Cache-Control",
-            "private, no-store, max-age=0"
-        );
-
-        res.setHeader(
-            "Pragma",
-            "no-cache"
-        );
-
-        res.setHeader(
-            "X-Content-Type-Options",
-            "nosniff"
-        );
-
+        res.setHeader("Content-Type", document.fileType || "application/octet-stream");
+        res.setHeader("Content-Length", originalFile.length);
+        res.setHeader("Cache-Control", "private, no-store, max-age=0");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader(
             "Content-Disposition",
-            `inline; filename*=UTF-8''${encodeURIComponent(
-                document.originalName
-            )}`
+            `inline; filename*=UTF-8''${encodeURIComponent(document.originalName)}`
         );
 
-        return res
-            .status(200)
-            .send(originalFile);
-
+        return res.status(200).send(originalFile);
     } catch (error) {
-        console.error(
-            "Document access error:",
-            error
-        );
-
+        console.error("Document access error:", error);
         return res.status(500).json({
-            message:
-                "Failed to access document.",
-            error:
-                error.message,
+            message: "Failed to access document.",
+            error: error.message,
         });
     }
 };
