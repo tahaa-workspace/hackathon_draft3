@@ -24,6 +24,8 @@ import AdminAuditLogs from './pages/AdminAuditLogs';
 import UserDashboard from './pages/UserDashboard';
 import LegacyAccess from './pages/LegacyAccess';
 import Notifications from './pages/Notifications';
+import LegalAssistance from './pages/LegalAssistance';
+import LawyerConsultations from './pages/LawyerConsultations';
 import LawyerDashboard from './pages/LawyerDashboard';
 import Profile from './pages/Profile';
 
@@ -179,6 +181,15 @@ export default function App() {
           />
 
           <Route
+            path="/legal-assistance"
+            element={
+              <ProtectedRoute allowedRoles={['USER']}>
+                <LegalAssistance />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/notifications"
             element={
               <ProtectedRoute allowedRoles={['USER', 'LAWYER', 'ADMIN']}>
@@ -210,6 +221,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/lawyer/consultations"
+            element={
+              <ProtectedRoute allowedRoles={['LAWYER']}>
+                <LawyerConsultations />
               </ProtectedRoute>
             }
           />
