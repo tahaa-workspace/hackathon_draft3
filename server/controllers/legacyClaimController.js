@@ -1436,31 +1436,28 @@ export async function adminReviewClaim(
     await User.findById(
       claim.beneficiaryId
     ).select(
-      'role createdBy'
+      'role'
     );
 
-  const assignedCount =
-    await Document.countDocuments({
-      ownerId:
-        claim.ownerId,
-
-      assignedBeneficiaries:
-        claim.beneficiaryId,
-    });
+  const allocation =
+    claim.allocationId
+      ? await LegacyAllocation.findOne({
+          _id: claim.allocationId,
+          allocatedBy: claim.ownerId,
+          allocatedTo: claim.beneficiaryId,
+          status: { $ne: 'REVOKED' },
+        }).lean()
+      : null;
 
   const validLink =
-    beneficiary?.role ===
-      'BENEFICIARY' &&
-    beneficiary.createdBy
-      ?.toString() ===
-      claim.ownerId.toString();
+    beneficiary?.role === 'USER' &&
+    Boolean(allocation);
 
   if (
     action === 'FORWARD'
   ) {
     if (
       !validLink ||
-      assignedCount === 0 ||
       !claim
         .deathCertificate
         ?.publicId ||
@@ -1534,7 +1531,7 @@ export async function adminReviewClaim(
     .status(200)
     .json({
       message:
-        'Legacy Access Claim rejected. All beneficiary-uploaded claim documents and metadata have been permanently deleted.',
+        'Legacy Access Claim rejected. All claimant-uploaded claim documents and metadata have been permanently deleted.',
 
       deleted:
         true,
@@ -1951,7 +1948,7 @@ export async function getClaimFileUrl(
 
     const isBeneficiary =
       req.user.role ===
-        'BENEFICIARY' &&
+        'USER' &&
       claim.beneficiaryId
         .toString() ===
         req.user.id;
