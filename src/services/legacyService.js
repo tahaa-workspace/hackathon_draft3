@@ -242,3 +242,37 @@ export async function getAdminAuditLogs(params = {}) {
   );
   return data.logs || [];
 }
+
+
+/* =========================================================
+   DIRECT LIFETIME LEGAL CONSULTATION
+   ========================================================= */
+
+export async function getAvailableConsultationLawyers() {
+  const data = await request('/legal-requests/lawyers');
+  return data.lawyers || [];
+}
+
+export async function createLegalConsultation(payload) {
+  return request('/legal-requests', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function getMyLegalConsultations() {
+  const data = await request('/legal-requests/mine');
+  return data.requests || [];
+}
+
+export async function getLawyerConsultations() {
+  const data = await request('/legal-requests/lawyer');
+  return data.requests || [];
+}
+
+export async function updateLawyerConsultation(id, payload) {
+  return request('/legal-requests/lawyer/' + id, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
