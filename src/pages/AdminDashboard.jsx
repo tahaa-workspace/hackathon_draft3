@@ -62,15 +62,10 @@ function StatusBadge({ status }) {
 
 function RoleBadge({ role }) {
   const config = {
-    OWNER: {
-      label: 'Owner',
+    USER: {
+      label: 'User',
       style:
         'bg-indigo-50 text-indigo-700 ring-indigo-100',
-    },
-    BENEFICIARY: {
-      label: 'Beneficiary',
-      style:
-        'bg-cyan-50 text-cyan-700 ring-cyan-100',
     },
     LAWYER: {
       label: 'Lawyer',
@@ -80,7 +75,7 @@ function RoleBadge({ role }) {
   };
 
   const value =
-    config[role] || config.BENEFICIARY;
+    config[role] || config.USER;
 
   return (
     <span
@@ -216,8 +211,8 @@ export default function AdminDashboard() {
 
   const pendingCounts = useMemo(
     () => ({
-      owners: pending.filter(
-        (item) => item.role === 'OWNER'
+      users: pending.filter(
+        (item) => item.role === 'USER'
       ).length,
       lawyers: pending.filter(
         (item) => item.role === 'LAWYER'
@@ -239,12 +234,8 @@ export default function AdminDashboard() {
 
   const stats = useMemo(
     () => ({
-      owners: accounts.filter(
-        (item) => item.role === 'OWNER'
-      ).length,
-      beneficiaries: accounts.filter(
-        (item) =>
-          item.role === 'BENEFICIARY'
+      users: accounts.filter(
+        (item) => item.role === 'USER'
       ).length,
       lawyers: accounts.filter(
         (item) => item.role === 'LAWYER'
@@ -539,21 +530,21 @@ export default function AdminDashboard() {
             icon={Clock3}
             label="Pending review"
             value={pending.length}
-            helper={`${pendingCounts.owners} owners · ${pendingCounts.lawyers} lawyers`}
+            helper={`${pendingCounts.users} users · ${pendingCounts.lawyers} lawyers`}
             accent="amber"
           />
           <StatCard
             icon={UserRoundCheck}
-            label="Owners"
-            value={stats.owners}
-            helper="Registered vault owners"
+            label="Users"
+            value={stats.users}
+            helper="Unified normal accounts"
             accent="indigo"
           />
           <StatCard
             icon={Link2}
-            label="Beneficiaries"
-            value={stats.beneficiaries}
-            helper="Owner-created accounts"
+            label="User model"
+            value="Unified"
+            helper="Ownership and legacy access are relationships"
             accent="cyan"
           />
           <StatCard
@@ -588,7 +579,7 @@ export default function AdminDashboard() {
                   Pending registration approvals
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Verify Owner identity proofs and
+                  Verify User identity proofs and
                   Lawyer professional credentials before
                   activation.
                 </p>
@@ -602,8 +593,8 @@ export default function AdminDashboard() {
                   `All (${pending.length})`,
                 ],
                 [
-                  'OWNER',
-                  `Owners (${pendingCounts.owners})`,
+                  'USER',
+                  `Users (${pendingCounts.users})`,
                 ],
                 [
                   'LAWYER',
@@ -663,7 +654,7 @@ export default function AdminDashboard() {
                 No pending requests
               </p>
               <p className="mt-1 text-sm text-slate-400">
-                New Owner and Lawyer registrations
+                New User and Lawyer registrations
                 will appear here for review.
               </p>
             </div>
@@ -777,7 +768,7 @@ export default function AdminDashboard() {
                             </div>
                           ) : (
                             <span>
-                              Owner identity registration
+                              User identity registration
                             </span>
                           )}
                         </td>
@@ -959,11 +950,8 @@ export default function AdminDashboard() {
                 <option value="ALL">
                   All roles
                 </option>
-                <option value="OWNER">
-                  Owners
-                </option>
-                <option value="BENEFICIARY">
-                  Beneficiaries
+                <option value="USER">
+                  Users
                 </option>
                 <option value="LAWYER">
                   Lawyers
@@ -1091,29 +1079,12 @@ function AccountCard({
   onStatusChange,
 }) {
   const relationship =
-    item.role === 'OWNER'
-      ? `${item.beneficiaryCount || 0} ${
-          item.beneficiaryCount === 1
-            ? 'beneficiary'
-            : 'beneficiaries'
-        }`
-      : item.role === 'BENEFICIARY'
-        ? item.owner
-          ? `Owner: ${item.owner.name} (@${item.owner.username})`
-          : 'Owner unavailable'
-        : `${
-            item.lawyerProfile
-              ?.enrollmentNumber ||
-            'Enrollment unavailable'
-          } · ${
-            [
-              item.lawyerProfile?.city,
-              item.lawyerProfile?.state,
-            ]
-              .filter(Boolean)
-              .join(', ') ||
-            'Location unavailable'
-          }`;
+    item.role === 'LAWYER'
+      ? `${item.lawyerProfile?.enrollmentNumber || 'Enrollment unavailable'} · ${[
+          item.lawyerProfile?.city,
+          item.lawyerProfile?.state,
+        ].filter(Boolean).join(', ') || 'Location unavailable'}`
+      : 'Unified user account — asset ownership and legacy access are resource relationships.';
 
   const initial =
     item.name?.charAt(0)?.toUpperCase() || 'U';
