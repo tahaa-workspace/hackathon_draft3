@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
 
-const ALLOWED_ROLES = ['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER'];
+const ALLOWED_ROLES = ['ADMIN', 'USER', 'LAWYER'];
 const ALLOWED_STATUSES = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED'];
 
 const encryptedDocumentSchema = {
