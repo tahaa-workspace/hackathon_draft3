@@ -37,16 +37,10 @@ import ProfileContactEditor from '../components/profile/ProfileContactEditor';
 import '../styles/profile.css';
 
 const ROLE_META = {
-  OWNER: {
-    label: 'Owner',
-    description: 'Vault owner account',
+  USER: {
+    label: 'User',
+    description: 'Unified NextGen Vault account',
     Icon: User,
-  },
-
-  BENEFICIARY: {
-    label: 'Beneficiary',
-    description: 'Trusted beneficiary account',
-    Icon: Users,
   },
 
   LAWYER: {
