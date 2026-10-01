@@ -47,7 +47,7 @@ function blockDeprecatedReviewActions(req, res, next) {
 router.post(
   '/',
   protect,
-  authorize('BENEFICIARY'),
+  authorize('USER'),
   upload.fields([
     { name: 'deathCertificate', maxCount: 1 },
     { name: 'identityProof', maxCount: 1 },
@@ -56,7 +56,7 @@ router.post(
   createLegacyClaim
 );
 
-router.get('/mine', protect, authorize('BENEFICIARY'), listMyLegacyClaims);
+router.get('/mine', protect, authorize('USER'), listMyLegacyClaims);
 router.get(
   '/admin',
   protect,
@@ -69,7 +69,7 @@ router.put('/admin/:id/review', protect, authorize('ADMIN'), blockDeprecatedRevi
 router.get('/lawyer', protect, authorize('LAWYER'), listLawyerClaims);
 router.put('/lawyer/:id/review', protect, authorize('LAWYER'), blockDeprecatedReviewActions, lawyerReviewClaim);
 
-router.get('/:id/information-requests', protect, authorize('ADMIN', 'BENEFICIARY', 'LAWYER'), getClaimInformationRequests);
+router.get('/:id/information-requests', protect, authorize('ADMIN', 'USER', 'LAWYER'), getClaimInformationRequests);
 router.put(
   '/:id/request-more-information',
   protect,
@@ -80,35 +80,35 @@ router.put('/:id/reject', protect, authorize('ADMIN', 'LAWYER'), rejectLegacyCla
 router.post(
   '/:id/additional-information',
   protect,
-  authorize('BENEFICIARY'),
+  authorize('USER'),
   upload.array('additionalDocuments', 5),
   submitAdditionalInformation
 );
 router.get(
   '/:id/additional-files/:requestId/:fileIndex',
   protect,
-  authorize('ADMIN', 'BENEFICIARY', 'LAWYER'),
+  authorize('ADMIN', 'USER', 'LAWYER'),
   getAdditionalEvidenceFile
 );
 
-router.get('/:id/files/:kind', protect, authorize('ADMIN', 'BENEFICIARY', 'LAWYER'), getClaimFileUrl);
+router.get('/:id/files/:kind', protect, authorize('ADMIN', 'USER', 'LAWYER'), getClaimFileUrl);
 /*
 |--------------------------------------------------------------------------
-| BENEFICIARY LAWYER SELECTION
+| USER LAWYER SELECTION
 |--------------------------------------------------------------------------
 */
 
 router.get(
   '/lawyers',
   protect,
-  authorize('BENEFICIARY'),
+  authorize('USER'),
   listApprovedLawyers
 );
 
 router.put(
   '/:id/select-lawyer',
   protect,
-  authorize('BENEFICIARY'),
+  authorize('USER'),
   selectClaimLawyer
 );
 
