@@ -83,7 +83,7 @@ export async function register(req, res) {
     return res.status(400).json({ message: 'All fields are required.' });
   }
   if (!req.file) {
-    return res.status(400).json({ message: 'Aadhaar card image or PDF is required for owner registration.' });
+    return res.status(400).json({ message: 'Aadhaar card image or PDF is required for user registration.' });
   }
   if (password !== confirmPassword) {
     return res.status(400).json({ message: 'Password and confirm password do not match.' });
@@ -124,7 +124,7 @@ uploadResult =
       username: normalizedUsername,
       email: normalizedEmail,
       passwordHash,
-      role: 'OWNER',
+      role: 'USER',
       status: 'PENDING',
       createdBy: null,
       mustChangePassword: false,
@@ -173,7 +173,7 @@ aadhaarDocument: {
       }).catch(() => {});
     }
 
-    console.error('Owner registration error:', error);
+    console.error('user registration error:', error);
     return res.status(500).json({ message: 'Registration failed. Please try again.' });
   }
 }
