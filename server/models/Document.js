@@ -6,6 +6,7 @@ const documentSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: true,
+            index: true,
         },
 
         title: {
@@ -109,5 +110,7 @@ const documentSchema = new mongoose.Schema(
         timestamps: true,
     }
 );
+
+documentSchema.index({ ownerId: 1, createdAt: -1 });
 
 export default mongoose.model("Document", documentSchema);
