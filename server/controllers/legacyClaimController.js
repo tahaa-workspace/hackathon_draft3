@@ -6,6 +6,9 @@ import LegacyClaim from '../models/LegacyClaim.js';
 import User from '../models/User.js';
 import Document from '../models/Document.js';
 import LegacyAllocation from '../models/LegacyAllocation.js';
+import { createNotification } from '../services/notificationService.js';
+import { claimStageTemplate } from '../services/emailTemplates.js';
+import { writeAudit } from '../services/auditService.js';
 
 /*
 |--------------------------------------------------------------------------
@@ -1206,6 +1209,71 @@ export async function createLegacyClaim(
         status:
           'UNDER_ADMIN_REVIEW',
       });
+
+    const appUrl =
+      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+        .replace(/\/$/, '') + '/legacy-access';
+
+    await createNotification({
+      req,
+      recipientId: beneficiary._id,
+      type: 'LEGACY_CLAIM',
+      title: 'Legacy claim submitted',
+      message:
+        'Your legacy access claim has been submitted and is awaiting administrator verification.',
+      relatedEntityType: 'LegacyClaim',
+      relatedEntityId: claim._id,
+      email: beneficiary.email,
+      emailContent: claimStageTemplate({
+        recipientName: beneficiary.name,
+        subject: 'Legacy Claim Submitted – NextGen Vault',
+        message:
+          'Your legacy access claim has been submitted and is awaiting administrator verification.',
+        appUrl,
+      }),
+    });
+
+    const admins = await User.find({
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    }).select('name email');
+
+    await Promise.all(
+      admins.map((admin) =>
+        createNotification({
+          req,
+          recipientId: admin._id,
+          type: 'ADMIN_REVIEW',
+          title: 'Legacy claim awaiting review',
+          message:
+            beneficiary.name + ' submitted a claim for "' +
+            (allocation.assetId?.title || 'a legacy asset') + '".',
+          relatedEntityType: 'LegacyClaim',
+          relatedEntityId: claim._id,
+          email: admin.email,
+          emailContent: claimStageTemplate({
+            recipientName: admin.name,
+            subject: 'Legacy Claim Awaiting Admin Review – NextGen Vault',
+            message:
+              beneficiary.name + ' submitted a legacy claim that requires administrator review.',
+            appUrl:
+              (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+                .replace(/\/$/, '') + '/admin/legacy-claims',
+          }),
+        })
+      )
+    );
+
+    await writeAudit(req, {
+      action: 'LEGACY_CLAIM_SUBMITTED',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: 'Legacy access claim submitted for administrator review.',
+      metadata: {
+        allocationId: allocation._id.toString(),
+        assetId: allocation.assetId?._id?.toString?.() || allocation.assetId?.toString?.(),
+      },
+    });
 
     const populated =
       await populatedClaim(
