@@ -5,6 +5,12 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function emitNotificationRefresh() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('nextgen:notifications-changed'));
+  }
+}
+
 async function request(path, { method = 'GET', body, isForm = false } = {}) {
   const headers = { ...authHeaders() };
   if (!isForm) headers['Content-Type'] = 'application/json';
@@ -56,7 +62,9 @@ export async function submitLegacyClaim({
   formData.append('identityProof', identityProof);
   if (supportingDocument) formData.append('supportingDocument', supportingDocument);
   if (remarks) formData.append('remarks', remarks);
-  return request('/legacy-claims', { method: 'POST', body: formData, isForm: true });
+  const result = await request('/legacy-claims', { method: 'POST', body: formData, isForm: true });
+  emitNotificationRefresh();
+  return result;
 }
 
 export async function getMyLegacyClaims() {
@@ -216,10 +224,12 @@ export async function searchAllocationUsers(query) {
 }
 
 export async function createLegacyAllocation(payload) {
-  return request('/legacy-allocations', {
+  const result = await request('/legacy-allocations', {
     method: 'POST',
     body: payload,
   });
+  emitNotificationRefresh();
+  return result;
 }
 
 export async function revokeLegacyAllocation(id) {
@@ -295,10 +305,12 @@ export async function getAvailableConsultationLawyers() {
 }
 
 export async function createLegalConsultation(payload) {
-  return request('/legal-requests', {
+  const result = await request('/legal-requests', {
     method: 'POST',
     body: payload,
   });
+  emitNotificationRefresh();
+  return result;
 }
 
 export async function getMyLegalConsultations() {
@@ -325,8 +337,10 @@ export async function getLawyerConsultations() {
 }
 
 export async function updateLawyerConsultation(id, payload) {
-  return request('/legal-requests/lawyer/' + id, {
+  const result = await request('/legal-requests/lawyer/' + id, {
     method: 'PATCH',
     body: payload,
   });
+  emitNotificationRefresh();
+  return result;
 }
