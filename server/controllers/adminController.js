@@ -33,6 +33,7 @@ function registrationPayload(user) {
     name: user.name,
     username: user.username,
     email: user.email,
+    emailVerified: Boolean(user.emailVerified),
     role: user.role,
     status: user.status,
     createdAt: user.createdAt,
