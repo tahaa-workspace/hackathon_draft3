@@ -182,6 +182,12 @@ export async function loginUser({
   });
 }
 
+export async function logoutUser() {
+  return request('/auth/logout', {
+    method: 'POST',
+  });
+}
+
 /* =========================================================
    PROFILE CONTACT VERIFICATION
    ========================================================= */
