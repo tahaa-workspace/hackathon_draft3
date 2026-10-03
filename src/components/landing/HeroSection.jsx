@@ -77,9 +77,7 @@ export default function HeroSection({
           </h1>
 
           <p className="mt-7 max-w-2xl text-base leading-8 text-ink-500 sm:text-lg">
-            Organize important documents in one secure vault, create trusted
-            beneficiaries, and decide exactly who can access each part of your
-            digital legacy.
+            Organize important documents in one secure vault, allocate selected records\n            to trusted existing users, and decide exactly who can receive each part\n            of your digital legacy.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -149,7 +147,7 @@ export default function HeroSection({
                 <p className="text-[11px] font-semibold text-ink-800">
                   Controlled Access
                 </p>
-                <p className="text-[9px] text-ink-400">Owner decides</p>
+                <p className="text-[9px] text-ink-400">You decide</p>
               </div>
             </motion.div>
 
@@ -168,7 +166,7 @@ export default function HeroSection({
                     <p className="text-sm font-bold text-ink-900">
                       Next Gen Vault
                     </p>
-                    <p className="text-[11px] text-ink-400">Owner Dashboard</p>
+                    <p className="text-[11px] text-ink-400">User Dashboard</p>
                   </div>
                 </div>
 
@@ -229,7 +227,7 @@ export default function HeroSection({
                     Access stays controlled
                   </p>
                   <p className="mt-0.5 text-[10px] text-brand-700">
-                    Each beneficiary sees only the documents you assign.
+                    Each recipient sees only the documents allocated to their account.
                   </p>
                 </div>
               </div>
