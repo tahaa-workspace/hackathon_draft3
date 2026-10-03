@@ -1,6 +1,7 @@
 import LegalRequest, { LEGAL_REQUEST_STATUSES } from '../models/LegalRequest.js';
 import User from '../models/User.js';
-import Notification from '../models/Notification.js';
+import { createNotification } from '../services/notificationService.js';
+import { legalRequestTemplate, claimStageTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
 
 function payload(item) {
@@ -69,31 +70,50 @@ export async function createLegalRequest(req, res) {
     });
   }
 
-  const lawyer = await User.findOne({
-    _id: lawyerId,
-    role: 'LAWYER',
-    status: 'ACTIVE',
-  }).select('name username email');
+  const [lawyer, requester] = await Promise.all([
+    User.findOne({
+      _id: lawyerId,
+      role: 'LAWYER',
+      status: 'ACTIVE',
+    }).select('name username email'),
+    User.findById(req.user.id).select('name username email'),
+  ]);
 
   if (!lawyer) {
     return res.status(404).json({ message: 'Selected lawyer is not available.' });
   }
 
+  if (!requester) {
+    return res.status(404).json({ message: 'Requester account not found.' });
+  }
+
   const request = await LegalRequest.create({
-    requesterId: req.user.id,
+    requesterId: requester._id,
     lawyerId: lawyer._id,
     subject: String(subject).trim(),
     description: String(description).trim(),
     status: 'PENDING',
   });
 
-  await Notification.create({
+  const appUrl =
+    (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+      .replace(/\/$/, '') + '/lawyer/consultations';
+
+  await createNotification({
+    req,
     recipientId: lawyer._id,
     type: 'LEGAL_REQUEST',
     title: 'New Legal Consultation Request',
-    message: 'A user has requested a lifetime legal consultation: "' + request.subject + '".',
+    message: requester.name + ' requested a lifetime legal consultation: "' + request.subject + '".',
     relatedEntityType: 'LegalRequest',
     relatedEntityId: request._id,
+    email: lawyer.email,
+    emailContent: legalRequestTemplate({
+      recipientName: lawyer.name,
+      requesterName: requester.name,
+      subject: request.subject,
+      appUrl,
+    }),
   });
 
   await writeAudit(req, {
@@ -132,6 +152,16 @@ export async function updateLawyerLegalRequest(req, res) {
     return res.status(400).json({ message: 'Invalid legal request status.' });
   }
 
+  const allowedTransitions = {
+    PENDING: ['ACCEPTED', 'REJECTED', 'CANCELLED'],
+    ASSIGNED: ['ACCEPTED', 'REJECTED', 'CANCELLED'],
+    ACCEPTED: ['IN_PROGRESS', 'REJECTED', 'CANCELLED'],
+    IN_PROGRESS: ['COMPLETED', 'REJECTED', 'CANCELLED'],
+    COMPLETED: [],
+    REJECTED: [],
+    CANCELLED: [],
+  };
+
   const request = await LegalRequest.findOne({
     _id: req.params.id,
     lawyerId: req.user.id,
@@ -141,18 +171,45 @@ export async function updateLawyerLegalRequest(req, res) {
     return res.status(404).json({ message: 'Legal request not found.' });
   }
 
+  if (!allowedTransitions[request.status]?.includes(status)) {
+    return res.status(400).json({
+      message:
+        'Legal request cannot move from ' + request.status + ' to ' + status + '.',
+    });
+  }
+
   request.status = status;
   request.lawyerRemarks = String(lawyerRemarks || '').trim();
   await request.save();
 
-  await Notification.create({
-    recipientId: request.requesterId,
-    type: 'LEGAL_REQUEST',
-    title: 'Legal Consultation Updated',
-    message: 'Your legal consultation request is now ' + status.replaceAll('_', ' ').toLowerCase() + '.',
-    relatedEntityType: 'LegalRequest',
-    relatedEntityId: request._id,
-  });
+  const requester = await User.findById(request.requesterId).select('name email');
+
+  if (requester) {
+    const appUrl =
+      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+        .replace(/\/$/, '') + '/legal-assistance';
+
+    const statusMessage =
+      'Your legal consultation request is now ' +
+      status.replaceAll('_', ' ').toLowerCase() + '.';
+
+    await createNotification({
+      req,
+      recipientId: requester._id,
+      type: 'LEGAL_REQUEST',
+      title: 'Legal Consultation Updated',
+      message: statusMessage,
+      relatedEntityType: 'LegalRequest',
+      relatedEntityId: request._id,
+      email: requester.email,
+      emailContent: claimStageTemplate({
+        recipientName: requester.name,
+        subject: 'Legal Consultation Updated – NextGen Vault',
+        message: statusMessage,
+        appUrl,
+      }),
+    });
+  }
 
   await writeAudit(req, {
     action: 'LEGAL_REQUEST_UPDATED',
