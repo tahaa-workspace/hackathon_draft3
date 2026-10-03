@@ -22,7 +22,23 @@ import {
 } from '../services/legacyService';
 
 function claimForAllocation(claims, allocationId) {
-  return claims.find((claim) => claim.allocationId === allocationId) || null;
+  return (
+    claims.find(
+      (claim) =>
+        claim.allocationId === allocationId &&
+        claim.status !== 'REJECTED_PLATFORM_CLAIM'
+    ) || null
+  );
+}
+
+function latestRejectedClaimForAllocation(claims, allocationId) {
+  return (
+    claims.find(
+      (claim) =>
+        claim.allocationId === allocationId &&
+        claim.status === 'REJECTED_PLATFORM_CLAIM'
+    ) || null
+  );
 }
 
 function claimProgress(status) {
@@ -236,6 +252,8 @@ export default function LegacyAccess() {
           <div className="space-y-4">
             {allocations.map((allocation) => {
               const claim = claimForAllocation(claims, allocation.id);
+              const rejectedClaim =
+                latestRejectedClaimForAllocation(claims, allocation.id);
               const claimApproved =
                 claim?.status === 'APPROVED_INFORMATION_RELEASED';
               const canOpen =
@@ -275,6 +293,12 @@ export default function LegacyAccess() {
                           </>
                         )}
                       </div>
+
+                      {!claim && rejectedClaim && (
+                        <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-3 py-3 text-xs text-red-700">
+                          The previous claim was rejected. You may submit a new claim for this allocation with corrected or additional evidence.
+                        </div>
+                      )}
 
                       {claim && (() => {
                         const progress = claimProgress(claim.status);
