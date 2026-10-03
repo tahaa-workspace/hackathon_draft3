@@ -228,6 +228,11 @@ export const uploadDocument = async (req, res) => {
             });
         }
 
+        const sha256 = crypto
+            .createHash("sha256")
+            .update(req.file.buffer)
+            .digest("hex");
+
         const { encrypted, iv, authTag } = encryptBuffer(req.file.buffer);
 
         encryptedUpload = await uploadEncryptedBlob(encrypted);
@@ -247,6 +252,8 @@ export const uploadDocument = async (req, res) => {
             fileType: req.file.mimetype,
             fileSize: req.file.size,
             encryptedSize: encrypted.length,
+            sha256,
+            verificationStatus: "PENDING",
             encryption: {
                 algorithm: "aes-256-gcm",
                 iv,
@@ -286,7 +293,6 @@ export const uploadDocument = async (req, res) => {
 
         return res.status(500).json({
             message: "Failed to upload document.",
-            error: error.message,
         });
     }
 };
@@ -305,7 +311,6 @@ export const getDocuments = async (req, res) => {
 
         return res.status(500).json({
             message: "Failed to fetch documents.",
-            error: error.message,
         });
     }
 };
@@ -359,7 +364,6 @@ export const updateDocumentBeneficiaries = async (req, res) => {
 
         return res.status(500).json({
             message: "Failed to update document access.",
-            error: error.message,
         });
     }
 };
@@ -393,7 +397,6 @@ export const getAssignedDocuments = async (req, res) => {
         console.error("Get allocated documents error:", error);
         return res.status(500).json({
             message: "Failed to fetch legacy allocations.",
-            error: error.message,
         });
     }
 };
