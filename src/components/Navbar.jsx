@@ -186,14 +186,24 @@ export default function Navbar() {
           )}
 
           {user.role === 'ADMIN' && (
-            <button
-              type="button"
-              onClick={() => navigate('/admin/audit-logs')}
-              className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
-            >
-              <FileSearch2 size={16} />
-              Audit Logs
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/records')}
+                className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-white px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 xl:inline-flex"
+              >
+                <Archive size={16} />
+                Records
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/audit-logs')}
+                className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
+              >
+                <FileSearch2 size={16} />
+                Audit Logs
+              </button>
+            </>
           )}
 
           <div className="relative">
