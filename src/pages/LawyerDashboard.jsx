@@ -44,7 +44,7 @@ const FILTERS = [
   ['UNDER_LAWYER_REVIEW', 'Under Review'],
   [
     'MORE_INFORMATION_REQUIRED',
-    'Waiting for Beneficiary',
+    'Waiting for Claimant',
   ],
   [
     'APPROVED_INFORMATION_RELEASED',
@@ -63,10 +63,10 @@ function statusLabel(status) {
       'Under Lawyer Review',
 
     MORE_INFORMATION_REQUIRED:
-      'Waiting for Beneficiary Information',
+      'Waiting for Claimant Information',
 
     APPROVED_INFORMATION_RELEASED:
-      'Completed / Released',
+      'Approved / Unlocked',
 
     REJECTED_PLATFORM_CLAIM:
       'Rejected',
@@ -526,7 +526,7 @@ export default function LawyerDashboard() {
       ) {
 
         setError(
-          'Please specify what the Beneficiary must provide.'
+          'Please specify what the Claimant must provide.'
         );
 
         return;
@@ -664,7 +664,7 @@ export default function LawyerDashboard() {
 
       const confirmed =
         window.confirm(
-          'Approve this review and release only the Owner-assigned records to the Beneficiary?'
+          'Approve this review and release only the Allocating User-assigned records to the Claimant?'
         );
 
       if (
@@ -737,7 +737,7 @@ export default function LawyerDashboard() {
             </h1>
 
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">
-              Review Beneficiary Legacy Claims using
+              Review Claimant Legacy Claims using
               three outcomes: approve, reject, or
               request additional information.
             </p>
@@ -912,7 +912,7 @@ export default function LawyerDashboard() {
 
             [
               AlertTriangle,
-              'Waiting for Beneficiary',
+              'Waiting for Claimant',
               stats.moreInfo,
             ],
 
@@ -1106,14 +1106,14 @@ export default function LawyerDashboard() {
                           <h2 className="font-semibold text-ink-900">
 
                             {
-                              claim.beneficiary
+                              claim.claimant
                                 ?.name
                             }
 
                             {' → '}
 
                             {
-                              claim.owner
+                              claim.allocator
                                 ?.name
                             }
 
@@ -1155,16 +1155,16 @@ export default function LawyerDashboard() {
                           <div>
 
                             <dt className="text-xs text-ink-400">
-                              Owner
+                              Allocating User
                             </dt>
 
                             <dd className="font-medium text-ink-700">
 
-                              {claim.owner?.name}
+                              {claim.allocator?.name}
 
                               <br />
 
-                              {claim.owner?.email}
+                              {claim.allocator?.email}
 
                             </dd>
 
@@ -1174,20 +1174,20 @@ export default function LawyerDashboard() {
                           <div>
 
                             <dt className="text-xs text-ink-400">
-                              Beneficiary
+                              Claimant
                             </dt>
 
                             <dd className="font-medium text-ink-700">
 
                               {
-                                claim.beneficiary
+                                claim.claimant
                                   ?.name
                               }
 
                               <br />
 
                               {
-                                claim.beneficiary
+                                claim.claimant
                                   ?.email
                               }
 
@@ -1356,11 +1356,11 @@ export default function LawyerDashboard() {
                           <div>
 
                             <h3 className="text-sm font-semibold text-ink-800">
-                              Owner-assigned Vault records
+                              Allocating User-assigned Vault records
                             </h3>
 
                             <p className="mt-1 text-xs text-ink-400">
-                              These are the records pre-assigned by the Owner to this Beneficiary.
+                              These are the records pre-assigned by the Allocating User to this Claimant.
                             </p>
 
                           </div>
@@ -1459,8 +1459,8 @@ export default function LawyerDashboard() {
                                     {
                                       request.status ===
                                       'SUBMITTED'
-                                        ? 'Beneficiary resubmitted evidence'
-                                        : 'Waiting for Beneficiary'
+                                        ? 'Claimant resubmitted evidence'
+                                        : 'Waiting for Claimant'
                                     }
 
                                   </p>
@@ -1471,7 +1471,7 @@ export default function LawyerDashboard() {
                                     <p className="mt-2 text-ink-600">
 
                                       <span className="font-semibold">
-                                        Beneficiary response:
+                                        Claimant response:
                                       </span>{' '}
 
                                       {
@@ -1636,7 +1636,7 @@ export default function LawyerDashboard() {
 
                       <div className="border-t border-ink-100 bg-orange-50 px-5 py-4 text-sm font-medium text-orange-800">
 
-                        Waiting for the Beneficiary to upload
+                        Waiting for the Claimant to upload
                         the requested additional documents.
 
                       </div>
