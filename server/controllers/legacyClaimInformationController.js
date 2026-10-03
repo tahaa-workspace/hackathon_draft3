@@ -167,70 +167,72 @@ export async function getClaimInformationRequests(req, res) {
 export async function requestMoreInformation(req, res) {
   try {
     const message = String(req.body?.message || '').trim();
+
     if (!message) {
-      return res.status(400).json({ message: 'Please specify what additional information or document is required.' });
+      return res.status(400).json({
+        message: 'Please specify what additional information or document is required.',
+      });
     }
 
     const claim = await LegacyClaim.findById(req.params.id);
-    if (!claim) return res.status(404).json({ message: 'Legacy Access Claim not found.' });
 
-    const existingPending = (claim.informationRequests || []).some((item) => item.status === 'PENDING');
-    if (existingPending || claim.status === 'MORE_INFORMATION_REQUIRED') {
-      return res.status(409).json({ message: 'The Beneficiary already has a pending information request for this claim.' });
+    if (!claim) {
+      return res.status(404).json({
+        message: 'Legacy Access Claim not found.',
+      });
     }
 
-    
-if (
-  req.user.role !== 'LAWYER'
-) {
-  return res
-    .status(403)
-    .json({
-      message:
-        'Only the assigned Lawyer can request additional information.',
-    });
-}
+    const existingPending = (claim.informationRequests || [])
+      .some((item) => item.status === 'PENDING');
 
-if (
-  !isAssignedLawyer(
-    claim,
-    req.user.id
-  )
-) {
-  return res
-    .status(403)
-    .json({
-      message:
-        'This Legacy Claim is not assigned to you.',
-    });
-}
+    if (existingPending || claim.status === 'MORE_INFORMATION_REQUIRED') {
+      return res.status(409).json({
+        message: 'The claimant already has a pending information request for this claim.',
+      });
+    }
 
-if (
-  claim.status !==
-  'UNDER_LAWYER_REVIEW'
-) {
-  return res
-    .status(400)
-    .json({
-      message:
-        'Additional information can be requested only while the claim is under Lawyer review.',
-    });
-}
+    let returnStatus;
 
-const returnStatus =
-  'UNDER_LAWYER_REVIEW';
+    if (req.user.role === 'ADMIN') {
+      if (claim.status !== 'UNDER_ADMIN_REVIEW') {
+        return res.status(400).json({
+          message:
+            'Admin can request additional information only while the claim is under Admin review.',
+        });
+      }
 
-claim.lawyerReview.reviewedBy =
-  req.user.id;
+      returnStatus = 'UNDER_ADMIN_REVIEW';
 
-claim.lawyerReview.reviewedAt =
-  new Date();
+      claim.adminReview = {
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        remarks: message,
+      };
+    } else if (req.user.role === 'LAWYER') {
+      if (!isAssignedLawyer(claim, req.user.id)) {
+        return res.status(403).json({
+          message: 'This Legacy Claim is not assigned to you.',
+        });
+      }
 
-claim.lawyerReview.remarks =
-  message;
+      if (claim.status !== 'UNDER_LAWYER_REVIEW') {
+        return res.status(400).json({
+          message:
+            'Additional information can be requested only while the claim is under Lawyer review.',
+        });
+      }
 
-claim.lawyerReview.action =
-  'REQUEST_MORE_INFORMATION';
+      returnStatus = 'UNDER_LAWYER_REVIEW';
+
+      claim.lawyerReview.reviewedBy = req.user.id;
+      claim.lawyerReview.reviewedAt = new Date();
+      claim.lawyerReview.remarks = message;
+      claim.lawyerReview.action = 'REQUEST_MORE_INFORMATION';
+    } else {
+      return res.status(403).json({
+        message: 'Only Admin or the assigned Lawyer can request additional information.',
+      });
+    }
 
     claim.informationRequests.push({
       requestedByRole: req.user.role,
@@ -240,6 +242,7 @@ claim.lawyerReview.action =
       status: 'PENDING',
       requestedAt: new Date(),
     });
+
     claim.status = 'MORE_INFORMATION_REQUIRED';
     await claim.save();
 
@@ -254,7 +257,7 @@ claim.lawyerReview.action =
       await createNotification({
         req,
         recipientId: claimant._id,
-        type: 'LAWYER_REVIEW',
+        type: req.user.role === 'ADMIN' ? 'ADMIN_REVIEW' : 'LAWYER_REVIEW',
         title: 'Additional claim information required',
         message,
         relatedEntityType: 'LegacyClaim',
@@ -273,14 +276,20 @@ claim.lawyerReview.action =
       action: 'LEGACY_CLAIM_INFORMATION_REQUESTED',
       entityType: 'LegacyClaim',
       entityId: claim._id,
-      description: 'Assigned lawyer requested additional claim evidence.',
+      description:
+        req.user.role === 'ADMIN'
+          ? 'Administrator requested additional claim evidence.'
+          : 'Assigned lawyer requested additional claim evidence.',
       metadata: {
+        requestedByRole: req.user.role,
         informationRequestId:
           claim.informationRequests[claim.informationRequests.length - 1]._id.toString(),
       },
     });
 
-    const latest = claim.informationRequests[claim.informationRequests.length - 1];
+    const latest =
+      claim.informationRequests[claim.informationRequests.length - 1];
+
     return res.json({
       message: 'Additional information requested from the claimant.',
       status: claim.status,
@@ -288,7 +297,9 @@ claim.lawyerReview.action =
     });
   } catch (error) {
     console.error('Request more information error:', error);
-    return res.status(500).json({ message: 'Unable to request additional information.' });
+    return res.status(500).json({
+      message: 'Unable to request additional information.',
+    });
   }
 }
 
