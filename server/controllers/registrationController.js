@@ -15,6 +15,7 @@ import {
   uploadEncryptedAadhaar,
   deleteEncryptedAadhaar,
 } from '../services/aadhaarEncryptionService.js';
+import { validateUploadedFile } from '../services/fileValidationService.js';
 
 
 const SALT_ROUNDS = 12;
@@ -1197,6 +1198,20 @@ export async function registerOwner(
       .json({
         message:
           'Aadhaar card image or PDF is required for user registration.',
+      });
+  }
+
+  const aadhaarValidation =
+    validateUploadedFile(
+      req.file
+    );
+
+  if (!aadhaarValidation.valid) {
+    return res
+      .status(400)
+      .json({
+        message:
+          aadhaarValidation.message,
       });
   }
 
