@@ -2232,6 +2232,16 @@ export async function getClaimFileUrl(
       'nosniff'
     );
 
+    await writeAudit(req, {
+      action: 'LEGACY_CLAIM_EVIDENCE_VIEWED',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: 'Authorized user viewed protected legacy claim evidence.',
+      metadata: {
+        evidenceKind: req.params.kind,
+      },
+    });
+
     return res
       .status(200)
       .send(originalFile);
@@ -2246,9 +2256,6 @@ export async function getClaimFileUrl(
       .json({
         message:
           'Failed to access Legacy Claim document.',
-
-        error:
-          error.message,
       });
   }
 }
