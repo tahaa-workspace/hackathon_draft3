@@ -2232,11 +2232,15 @@ export async function getClaimFileUrl(
         });
     }
 
-    const isBeneficiary =
+    const claimantId =
+      claim.claimantId ||
+      claim.beneficiaryId;
+
+    const isClaimant =
       req.user.role ===
         'USER' &&
-      claim.beneficiaryId
-        .toString() ===
+      claimantId
+        ?.toString() ===
         req.user.id;
 
     const isAdmin =
@@ -2251,7 +2255,7 @@ export async function getClaimFileUrl(
         req.user.id;
 
     if (
-      !isBeneficiary &&
+      !isClaimant &&
       !isAdmin &&
       !isAssignedLawyer
     ) {
