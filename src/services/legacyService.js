@@ -185,7 +185,11 @@ export async function getAdditionalClaimFile(id, requestId, fileIndex) {
 
 
 export async function openDocument(documentId) {
-  return requestBlob('/documents/' + documentId + '/access');
+  return requestBlob('/documents/' + documentId + '/view');
+}
+
+export async function downloadDocument(documentId) {
+  return requestBlob('/documents/' + documentId + '/download');
 }
 
 export async function getIncomingAllocations() {
