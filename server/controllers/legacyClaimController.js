@@ -5,6 +5,7 @@ import streamifier from 'streamifier';
 import LegacyClaim from '../models/LegacyClaim.js';
 import User from '../models/User.js';
 import Document from '../models/Document.js';
+import LegacyAllocation from '../models/LegacyAllocation.js';
 
 /*
 |--------------------------------------------------------------------------
@@ -511,6 +512,16 @@ function claimPayload(claim) {
     id:
       claim._id.toString(),
 
+    allocationId:
+      claim.allocationId?._id?.toString?.() ||
+      claim.allocationId?.toString?.() ||
+      null,
+
+    claimantId:
+      claim.claimantId?._id?.toString?.() ||
+      claim.claimantId?.toString?.() ||
+      null,
+
     owner:
       personPayload(owner),
 
@@ -584,6 +595,14 @@ function claimPayload(claim) {
 async function populatedClaim(query) {
   return query
     .populate(
+      'allocationId',
+      'assetId allocatedBy allocatedTo status releaseCondition releaseDate permissions'
+    )
+    .populate(
+      'claimantId',
+      'name username email role'
+    )
+    .populate(
       'ownerId',
       'name username email role'
     )
@@ -601,7 +620,7 @@ async function populatedClaim(query) {
 
 /*
 |--------------------------------------------------------------------------
-| OWNER RECORD PAYLOAD
+| ALLOCATED RECORD PAYLOAD
 |--------------------------------------------------------------------------
 */
 
@@ -815,7 +834,7 @@ async function deleteStoredClaimFile(
 
 /*
 |--------------------------------------------------------------------------
-| DELETE ALL BENEFICIARY-UPLOADED CLAIM FILES
+| DELETE ALL CLAIMANT-UPLOADED CLAIM FILES
 |--------------------------------------------------------------------------
 */
 
@@ -930,44 +949,51 @@ export async function createLegacyClaim(
   req,
   res
 ) {
-  const beneficiary =
-    await User.findById(
-      req.user.id
-    ).select(
-      'role createdBy name username email'
-    );
+  const allocationId = String(req.body?.allocationId || '').trim();
 
-  if (
-    !beneficiary ||
-    beneficiary.role !==
-      'BENEFICIARY' ||
-    !beneficiary.createdBy
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'This beneficiary account is not linked to an owner.',
-      });
+  if (!allocationId) {
+    return res.status(400).json({
+      message: 'Select a legacy allocation before submitting a claim.',
+    });
   }
 
-  const owner =
-    await User.findById(
-      beneficiary.createdBy
-    ).select(
-      'name username email role status'
-    );
+  const allocation = await LegacyAllocation.findOne({
+    _id: allocationId,
+    allocatedTo: req.user.id,
+    status: { $in: ['ACTIVE', 'PENDING', 'RELEASED'] },
+  })
+    .populate('allocatedBy', 'name username email role status')
+    .populate('assetId', 'title recordType ownerId');
 
-  if (
-    !owner ||
-    owner.role !== 'OWNER'
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'Linked owner account could not be found.',
-      });
+  if (!allocation) {
+    return res.status(404).json({
+      message: 'Legacy allocation not found or you are not its recipient.',
+    });
+  }
+
+  if (allocation.releaseCondition === 'DATE' &&
+      allocation.releaseDate &&
+      new Date(allocation.releaseDate) > new Date()) {
+    return res.status(400).json({
+      message: 'This allocation is not yet eligible for a legacy access claim.',
+    });
+  }
+
+  const beneficiary = await User.findById(req.user.id)
+    .select('role name username email');
+
+  if (!beneficiary || beneficiary.role !== 'USER') {
+    return res.status(403).json({
+      message: 'Only a normal user can claim an incoming legacy allocation.',
+    });
+  }
+
+  const owner = allocation.allocatedBy;
+
+  if (!owner || owner.status !== 'ACTIVE') {
+    return res.status(400).json({
+      message: 'The allocating user account is unavailable.',
+    });
   }
 
   const deathFile =
@@ -1010,33 +1036,9 @@ export async function createLegacyClaim(
       });
   }
 
-  const assignedCount =
-    await Document.countDocuments({
-      ownerId:
-        owner._id,
-
-      assignedBeneficiaries:
-        beneficiary._id,
-    });
-
-  if (
-    assignedCount === 0
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'No Owner-assigned records exist for this beneficiary, so a Legacy Access Claim cannot be created yet.',
-      });
-  }
-
   const existing =
     await LegacyClaim.findOne({
-      ownerId:
-        owner._id,
-
-      beneficiaryId:
-        beneficiary._id,
+      allocationId: allocation._id,
 
       status: {
         $in: [
@@ -1055,7 +1057,7 @@ export async function createLegacyClaim(
       .status(409)
       .json({
         message:
-          'A Legacy Access Claim already exists for this Owner-Beneficiary relationship.',
+          'A Legacy Access Claim already exists for this allocation.',
       });
   }
 
@@ -1155,6 +1157,12 @@ export async function createLegacyClaim(
 
     const claim =
       await LegacyClaim.create({
+        allocationId:
+          allocation._id,
+
+        claimantId:
+          beneficiary._id,
+
         ownerId:
           owner._id,
 
@@ -1265,7 +1273,7 @@ export async function createLegacyClaim(
 
 /*
 |--------------------------------------------------------------------------
-| BENEFICIARY CLAIM LIST
+| CLAIMANT CLAIM LIST
 |--------------------------------------------------------------------------
 */
 
@@ -1428,31 +1436,28 @@ export async function adminReviewClaim(
     await User.findById(
       claim.beneficiaryId
     ).select(
-      'role createdBy'
+      'role'
     );
 
-  const assignedCount =
-    await Document.countDocuments({
-      ownerId:
-        claim.ownerId,
-
-      assignedBeneficiaries:
-        claim.beneficiaryId,
-    });
+  const allocation =
+    claim.allocationId
+      ? await LegacyAllocation.findOne({
+          _id: claim.allocationId,
+          allocatedBy: claim.ownerId,
+          allocatedTo: claim.beneficiaryId,
+          status: { $ne: 'REVOKED' },
+        }).lean()
+      : null;
 
   const validLink =
-    beneficiary?.role ===
-      'BENEFICIARY' &&
-    beneficiary.createdBy
-      ?.toString() ===
-      claim.ownerId.toString();
+    beneficiary?.role === 'USER' &&
+    Boolean(allocation);
 
   if (
     action === 'FORWARD'
   ) {
     if (
       !validLink ||
-      assignedCount === 0 ||
       !claim
         .deathCertificate
         ?.publicId ||
@@ -1482,7 +1487,7 @@ export async function adminReviewClaim(
 
   /*
   |--------------------------------------------------------------------------
-  | DELETE ALL BENEFICIARY LEGACY CLAIM FILES
+  | DELETE ALL CLAIMANT LEGACY CLAIM FILES
   |--------------------------------------------------------------------------
   */
 
@@ -1526,7 +1531,7 @@ export async function adminReviewClaim(
     .status(200)
     .json({
       message:
-        'Legacy Access Claim rejected. All beneficiary-uploaded claim documents and metadata have been permanently deleted.',
+        'Legacy Access Claim rejected. All claimant-uploaded claim documents and metadata have been permanently deleted.',
 
       deleted:
         true,
@@ -1943,7 +1948,7 @@ export async function getClaimFileUrl(
 
     const isBeneficiary =
       req.user.role ===
-        'BENEFICIARY' &&
+        'USER' &&
       claim.beneficiaryId
         .toString() ===
         req.user.id;

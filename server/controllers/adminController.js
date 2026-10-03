@@ -77,16 +77,7 @@ function registrationPayload(user) {
 }
 
 
-function accountPayload(
-  user,
-  beneficiaryCounts = new Map()
-) {
-  const creator =
-    user.createdBy &&
-    typeof user.createdBy === 'object'
-      ? user.createdBy
-      : null;
-
+function accountPayload(user) {
   return {
     id: user._id.toString(),
     name: user.name,
@@ -94,59 +85,17 @@ function accountPayload(
     email: user.email,
     role: user.role,
     status: user.status,
-    mustChangePassword:
-      user.mustChangePassword,
-    createdAt:
-      user.createdAt,
-    updatedAt:
-      user.updatedAt,
-
-    beneficiaryCount:
-      user.role === 'OWNER'
-        ? (
-            beneficiaryCounts.get(
-              user._id.toString()
-            ) || 0
-          )
-        : 0,
-
-    owner:
-      user.role === 'BENEFICIARY' &&
-      creator
-        ? {
-            id:
-              creator._id.toString(),
-            name:
-              creator.name,
-            username:
-              creator.username,
-            email:
-              creator.email,
-          }
-        : null,
-
+    mustChangePassword: user.mustChangePassword,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
     lawyerProfile:
       user.role === 'LAWYER'
         ? {
-            phone:
-              user.lawyerProfile?.phone ||
-              null,
-
-            city:
-              user.lawyerProfile?.city ||
-              null,
-
-            state:
-              user.lawyerProfile?.state ||
-              null,
-
-            enrollmentNumber:
-              user.lawyerProfile?.enrollmentNumber ||
-              null,
-
-            stateBarCouncil:
-              user.lawyerProfile?.stateBarCouncil ||
-              null,
+            phone: user.lawyerProfile?.phone || null,
+            city: user.lawyerProfile?.city || null,
+            state: user.lawyerProfile?.state || null,
+            enrollmentNumber: user.lawyerProfile?.enrollmentNumber || null,
+            stateBarCouncil: user.lawyerProfile?.stateBarCouncil || null,
           }
         : null,
   };
@@ -169,7 +118,7 @@ export async function listPendingRegistrations(
         status: 'PENDING',
         role: {
           $in: [
-            'OWNER',
+            'USER',
             'LAWYER',
           ],
         },
@@ -188,11 +137,11 @@ export async function listPendingRegistrations(
           pending.length,
 
         summary: {
-          owners:
+          users:
             pending.filter(
               (user) =>
                 user.role ===
-                'OWNER'
+                'USER'
             ).length,
 
           lawyers:
@@ -236,137 +185,31 @@ export async function listUsers(
   res
 ) {
   try {
-    const users =
-      await User.find({
-        role: {
-          $in: [
-            'OWNER',
-            'BENEFICIARY',
-            'LAWYER',
-          ],
-        },
-      })
-        .populate(
-          'createdBy',
-          'name username email'
-        )
-        .sort({
-          createdAt: -1,
-        })
-        .select(
-          '-passwordHash'
-        );
+    const users = await User.find({
+      role: { $in: ['USER', 'LAWYER'] },
+    })
+      .sort({ createdAt: -1 })
+      .select('-passwordHash');
 
-    const beneficiaryCounts =
-      new Map();
+    const accounts = users.map(accountPayload);
 
-    users.forEach(
-      (user) => {
-        if (
-          user.role !==
-            'BENEFICIARY' ||
-          !user.createdBy?._id
-        ) {
-          return;
-        }
-
-        const ownerId =
-          user.createdBy._id
-            .toString();
-
-        beneficiaryCounts.set(
-          ownerId,
-          (
-            beneficiaryCounts.get(
-              ownerId
-            ) || 0
-          ) + 1
-        );
-      }
-    );
-
-    const accounts =
-      users.map(
-        (user) =>
-          accountPayload(
-            user,
-            beneficiaryCounts
-          )
-      );
-
-    return res
-      .status(200)
-      .json({
-        count:
-          accounts.length,
-
-        summary: {
-          owners:
-            accounts.filter(
-              (user) =>
-                user.role ===
-                'OWNER'
-            ).length,
-
-          beneficiaries:
-            accounts.filter(
-              (user) =>
-                user.role ===
-                'BENEFICIARY'
-            ).length,
-
-          lawyers:
-            accounts.filter(
-              (user) =>
-                user.role ===
-                'LAWYER'
-            ).length,
-
-          active:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'ACTIVE'
-            ).length,
-
-          suspended:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'SUSPENDED'
-            ).length,
-
-          pending:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'PENDING'
-            ).length,
-
-          rejected:
-            accounts.filter(
-              (user) =>
-                user.status ===
-                'REJECTED'
-            ).length,
-        },
-
-        users:
-          accounts,
-      });
-
+    return res.status(200).json({
+      count: accounts.length,
+      summary: {
+        users: accounts.filter((user) => user.role === 'USER').length,
+        lawyers: accounts.filter((user) => user.role === 'LAWYER').length,
+        active: accounts.filter((user) => user.status === 'ACTIVE').length,
+        suspended: accounts.filter((user) => user.status === 'SUSPENDED').length,
+        pending: accounts.filter((user) => user.status === 'PENDING').length,
+        rejected: accounts.filter((user) => user.status === 'REJECTED').length,
+      },
+      users: accounts,
+    });
   } catch (error) {
-    console.error(
-      'List users error:',
-      error
-    );
-
-    return res
-      .status(500)
-      .json({
-        message:
-          'Unable to fetch users.',
-      });
+    console.error('Admin list users error:', error);
+    return res.status(500).json({
+      message: 'Failed to load platform users.',
+    });
   }
 }
 
@@ -422,8 +265,8 @@ export async function updateUserStatus(
 
     if (
       ![
-        'OWNER',
-        'BENEFICIARY',
+        'USER',
+        'USER',
         'LAWYER',
       ].includes(
         user.role
@@ -521,13 +364,13 @@ export async function getAadhaarReviewUrl(
     if (
       !user ||
       user.role !==
-        'OWNER'
+        'USER'
     ) {
       return res
         .status(404)
         .json({
           message:
-            'Owner registration not found.',
+            'User registration not found.',
         });
     }
 
@@ -867,7 +710,7 @@ export async function approveUser(
 
     if (
       user.role ===
-        'OWNER' &&
+        'USER' &&
       !user.aadhaarDocument
         ?.publicId
     ) {
@@ -875,7 +718,7 @@ export async function approveUser(
         .status(400)
         .json({
           message:
-            'Owner registration is missing its Aadhaar verification document.',
+            'User registration is missing its Aadhaar verification document.',
         });
     }
 
@@ -896,7 +739,7 @@ export async function approveUser(
 
     if (
       ![
-        'OWNER',
+        'USER',
         'LAWYER',
       ].includes(
         user.role
@@ -933,7 +776,7 @@ export async function approveUser(
           user.role ===
           'LAWYER'
             ? 'Lawyer approved. The professional account is now active.'
-            : 'Owner approved. They may now log in.',
+            : 'User approved. They may now log in.',
 
         user:
           registrationPayload(
@@ -1005,7 +848,7 @@ export async function rejectUser(
 
     if (
       ![
-        'OWNER',
+        'USER',
         'LAWYER',
       ].includes(
         user.role
@@ -1023,7 +866,7 @@ export async function rejectUser(
       user.role ===
       'LAWYER'
         ? 'Lawyer'
-        : 'Owner';
+        : 'User';
 
     const verificationDocument =
       user.role ===
@@ -1041,7 +884,7 @@ export async function rejectUser(
         ?.resourceType ||
       (
         user.role ===
-        'OWNER'
+        'USER'
           ? 'raw'
           : 'image'
       );

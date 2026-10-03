@@ -74,6 +74,18 @@ export const LEGACY_CLAIM_STATUSES = [
 
 const legacyClaimSchema = new Schema(
   {
+    allocationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'LegacyAllocation',
+      default: null,
+      index: true,
+    },
+    claimantId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     ownerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -133,6 +145,8 @@ const legacyClaimSchema = new Schema(
   { timestamps: true }
 );
 
+legacyClaimSchema.index({ allocationId: 1, status: 1 });
+legacyClaimSchema.index({ claimantId: 1, status: 1 });
 legacyClaimSchema.index({ ownerId: 1, beneficiaryId: 1, status: 1 });
 
 export default mongoose.model('LegacyClaim', legacyClaimSchema);

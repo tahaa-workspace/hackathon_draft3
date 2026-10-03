@@ -37,16 +37,10 @@ import ProfileContactEditor from '../components/profile/ProfileContactEditor';
 import '../styles/profile.css';
 
 const ROLE_META = {
-  OWNER: {
-    label: 'Owner',
-    description: 'Vault owner account',
+  USER: {
+    label: 'User',
+    description: 'Unified NextGen Vault account',
     Icon: User,
-  },
-
-  BENEFICIARY: {
-    label: 'Beneficiary',
-    description: 'Trusted beneficiary account',
-    Icon: Users,
   },
 
   LAWYER: {
@@ -215,17 +209,17 @@ export default function Profile() {
                   <Privilege
                     icon={UserCog}
                     title="Account control"
-                    description="Search, activate, and suspend Owner and Beneficiary accounts."
+                    description="Search, activate, and suspend User accounts."
                   />
                   <Privilege
                     icon={FileCheck2}
                     title="Identity review"
-                    description="Review Owner Aadhaar submissions before approving registrations."
+                    description="Review User Aadhaar submissions before approving registrations."
                   />
                   <Privilege
                     icon={LockKeyhole}
                     title="Privacy boundary"
-                    description="Administrative access does not grant access to private Owner vault documents."
+                    description="Administrative access does not grant access to private user vault documents."
                   />
                 </div>
               </ProfileInfoCard>
@@ -251,7 +245,7 @@ export default function Profile() {
                   <Privilege
                     icon={LockKeyhole}
                     title="Scoped access"
-                    description="Legal review access is limited to assigned claims and does not provide unrestricted access to Owner vault records."
+                    description="Legal review access is limited to assigned claims and does not provide unrestricted access to private user vault records."
                   />
                 </div>
               </ProfileInfoCard>
@@ -302,8 +296,8 @@ export default function Profile() {
                       </h3>
                       <p className="mt-1 max-w-xl text-xs leading-5 text-red-700">
                         This cannot be undone. Stored identity files and account-owned data are removed from Cloudinary and MongoDB Atlas.
-                        {user.role === 'OWNER'
-                          ? ' Beneficiary accounts created by this Owner are deleted as part of the cascade.'
+                        {user.role === 'USER'
+                          ? ' Related allocations and claims are deleted as part of the account cleanup.'
                           : ''}
                       </p>
                     </div>
@@ -387,9 +381,9 @@ export default function Profile() {
 
                 <p className="mt-1 text-xs leading-5 text-brand-700">
                   {isAdmin
-                    ? 'This role can manage accounts and registration verification, while private Owner vault documents remain role-protected.'
+                    ? 'This role can manage accounts and registration verification, while private user vault documents remain role-protected.'
                     : isLawyer
-                      ? 'This role can review only assigned Legacy Access Claims. Private Owner vault documents remain protected outside the authorized claim workflow.'
+                      ? 'This role can review only assigned Legacy Access Claims. Private user vault documents remain protected outside the authorized claim workflow.'
                       : 'Your available actions are determined by your authenticated role and assigned permissions.'}
                 </p>
               </div>
@@ -448,21 +442,21 @@ export default function Profile() {
                   Your account metadata, identity document, authentication/verification records, and data owned by this account.
                 </p>
 
-                {user.role === 'OWNER' && (
+                {user.role === 'USER' && (
                   <p className="mt-2">
-                    Owner deletion also removes all vault documents, their Cloudinary placeholders, related Legacy Claim evidence, and Beneficiary accounts created by this Owner.
+                    Deleting a User removes that user's owned vault documents, related claim evidence, allocations, and notifications.
                   </p>
                 )}
 
-                {user.role === 'BENEFICIARY' && (
+                {false && (
                   <p className="mt-2">
-                    Beneficiary deletion removes your identity file, claim evidence, relationship metadata, and your access references from Owner documents. The Owner's documents themselves are not deleted.
+                    Deleting a User removes the account's identity data, owned records, claim evidence, allocations, and notifications.
                   </p>
                 )}
 
                 {user.role === 'LAWYER' && (
                   <p className="mt-2">
-                    Lawyer deletion removes the professional credential. Active assigned claims are returned to Lawyer selection instead of deleting the Beneficiary's claim.
+                    Lawyer deletion removes the professional credential. Active assigned claims are returned to Lawyer selection instead of deleting the claimant's claim.
                   </p>
                 )}
               </div>

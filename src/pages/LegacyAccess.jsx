@@ -1,0 +1,320 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  CheckCircle2,
+  Eye,
+  FileLock2,
+  Loader2,
+  LockKeyhole,
+  ShieldCheck,
+  Upload,
+} from 'lucide-react';
+
+import Navbar from '../components/Navbar';
+import {
+  getIncomingAllocations,
+  getMyLegacyClaims,
+  openDocument,
+  submitLegacyClaim,
+} from '../services/legacyService';
+
+function claimForAllocation(claims, allocationId) {
+  return claims.find((claim) => claim.allocationId === allocationId) || null;
+}
+
+function canAccessWithoutClaim(allocation) {
+  if (allocation.status === 'RELEASED' || allocation.releaseCondition === 'IMMEDIATE') {
+    return true;
+  }
+
+  if (
+    allocation.releaseCondition === 'DATE' &&
+    allocation.releaseDate &&
+    new Date(allocation.releaseDate) <= new Date()
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export default function LegacyAccess() {
+  const [allocations, setAllocations] = useState([]);
+  const [claims, setClaims] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [claimingId, setClaimingId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [form, setForm] = useState({
+    identityProofType: 'AADHAAR',
+    remarks: '',
+    deathCertificate: null,
+    identityProof: null,
+    supportingDocument: null,
+  });
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [incoming, myClaims] = await Promise.all([
+        getIncomingAllocations(),
+        getMyLegacyClaims(),
+      ]);
+      setAllocations(incoming);
+      setClaims(myClaims);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const visibleCount = useMemo(() => allocations.length, [allocations]);
+
+  const handleOpen = async (assetId) => {
+    try {
+      const blob = await openDocument(assetId);
+      const url = URL.createObjectURL(blob);
+      const windowRef = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!windowRef) {
+        URL.revokeObjectURL(url);
+        throw new Error('The browser blocked the document window.');
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  const handleClaim = async (event, allocationId) => {
+    event.preventDefault();
+
+    if (!form.deathCertificate || !form.identityProof) {
+      setMessage('Death certificate and identity proof are required.');
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage('');
+
+    try {
+      await submitLegacyClaim({
+        allocationId,
+        identityProofType: form.identityProofType,
+        remarks: form.remarks,
+        deathCertificate: form.deathCertificate,
+        identityProof: form.identityProof,
+        supportingDocument: form.supportingDocument,
+      });
+
+      setMessage('Legacy access claim submitted for review.');
+      setClaimingId(null);
+      setForm({
+        identityProofType: 'AADHAAR',
+        remarks: '',
+        deathCertificate: null,
+        identityProof: null,
+        supportingDocument: null,
+      });
+      await refresh();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Navbar />
+
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-7 text-white shadow-xl">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-cyan-200">
+              <FileLock2 size={22} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.15em] text-cyan-200">Legacy Access</p>
+              <h1 className="mt-2 text-3xl font-bold">Allocations made to you</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                You can see that an asset has been allocated to you without exposing its protected file. Access is released only when the allocation conditions are satisfied.
+              </p>
+              <p className="mt-4 text-sm font-semibold text-white">
+                {visibleCount} allocation{visibleCount === 1 ? '' : 's'} received
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {message && (
+          <div className="rounded-2xl border border-indigo-100 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+            {message}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
+            <Loader2 size={18} className="animate-spin" />
+            Loading legacy access…
+          </div>
+        ) : allocations.length === 0 ? (
+          <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center">
+            <LockKeyhole size={28} className="mx-auto text-slate-400" />
+            <h2 className="mt-4 font-semibold text-slate-800">No incoming legacy allocations</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              When another user allocates an asset to you, it will appear here.
+            </p>
+          </section>
+        ) : (
+          <div className="space-y-4">
+            {allocations.map((allocation) => {
+              const claim = claimForAllocation(claims, allocation.id);
+              const directlyAccessible = canAccessWithoutClaim(allocation);
+              const claimApproved = claim?.status === 'APPROVED_INFORMATION_RELEASED';
+              const canOpen = directlyAccessible || claimApproved;
+
+              return (
+                <article key={allocation.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-lg font-semibold text-slate-900">
+                          {allocation.asset?.title || 'Legacy Asset'}
+                        </h2>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                          {allocation.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-500">
+                        Allocated by <strong className="text-slate-700">{allocation.allocatedBy?.name || 'User'}</strong>
+                        {allocation.allocatedBy?.username ? ' (@' + allocation.allocatedBy.username + ')' : ''}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {allocation.asset?.category} · {allocation.asset?.recordType}
+                      </p>
+
+                      <div className="mt-4 flex items-center gap-2 text-sm">
+                        {canOpen ? (
+                          <>
+                            <CheckCircle2 size={16} className="text-emerald-600" />
+                            <span className="font-medium text-emerald-700">Access available</span>
+                          </>
+                        ) : (
+                          <>
+                            <LockKeyhole size={16} className="text-indigo-600" />
+                            <span className="font-medium text-indigo-700">Protected / locked</span>
+                          </>
+                        )}
+                      </div>
+
+                      {claim && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          Claim status: <strong>{claim.status}</strong>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {canOpen && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpen(allocation.asset?.id)}
+                          className="btn-primary"
+                        >
+                          <Eye size={16} />
+                          View document
+                        </button>
+                      )}
+
+                      {!canOpen && !claim && allocation.releaseCondition === 'LEGACY_CLAIM' && (
+                        <button
+                          type="button"
+                          onClick={() => setClaimingId((current) => current === allocation.id ? null : allocation.id)}
+                          className="btn-primary"
+                        >
+                          <ShieldCheck size={16} />
+                          Claim Access
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {claimingId === allocation.id && !claim && (
+                    <form
+                      onSubmit={(event) => handleClaim(event, allocation.id)}
+                      className="mt-6 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-5"
+                    >
+                      <h3 className="font-semibold text-slate-900">Submit Legacy Access Claim</h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        The claim is tied specifically to this allocation.
+                      </p>
+
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Identity proof type
+                          <select
+                            className="field-input mt-1"
+                            value={form.identityProofType}
+                            onChange={(e) => setForm((value) => ({ ...value, identityProofType: e.target.value }))}
+                          >
+                            <option value="AADHAAR">Aadhaar</option>
+                            <option value="PASSPORT">Passport</option>
+                            <option value="DRIVING_LICENCE">Driving Licence</option>
+                            <option value="VOTER_ID">Voter ID</option>
+                            <option value="OTHER">Other</option>
+                          </select>
+                        </label>
+
+                        <label className="text-sm font-medium text-slate-700">
+                          Remarks
+                          <input
+                            className="field-input mt-1"
+                            value={form.remarks}
+                            onChange={(e) => setForm((value) => ({ ...value, remarks: e.target.value }))}
+                            placeholder="Optional context"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 md:grid-cols-3">
+                        {[
+                          ['Death certificate', 'deathCertificate', true],
+                          ['Identity proof', 'identityProof', true],
+                          ['Supporting document', 'supportingDocument', false],
+                        ].map(([label, key, required]) => (
+                          <label key={key} className="cursor-pointer rounded-2xl border border-dashed border-indigo-200 bg-white p-4">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                              <Upload size={15} />
+                              {label}{required ? ' *' : ''}
+                            </div>
+                            <input
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png"
+                              className="mt-3 block w-full text-xs text-slate-500"
+                              required={required}
+                              onChange={(e) => setForm((value) => ({ ...value, [key]: e.target.files?.[0] || null }))}
+                            />
+                          </label>
+                        ))}
+                      </div>
+
+                      <button disabled={submitting} className="btn-primary mt-4">
+                        {submitting ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                        {submitting ? 'Submitting…' : 'Submit claim'}
+                      </button>
+                    </form>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

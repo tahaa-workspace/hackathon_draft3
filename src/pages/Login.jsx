@@ -291,7 +291,7 @@ export default function Login() {
             to="/register"
             className="auth-create-button group"
           >
-            Create an Owner account
+            Create a User account
 
             <ArrowRight
               size={15}
@@ -311,8 +311,7 @@ export default function Login() {
 
         {/* Footer */}
         <p className="mt-8 text-center text-[11px] leading-5 text-ink-400">
-          Access is protected according to your
-          assigned role and permissions.
+          Access is protected according to your account and resource permissions.
         </p>
 
       </motion.div>

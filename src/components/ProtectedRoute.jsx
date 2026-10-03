@@ -26,8 +26,7 @@ export default function ProtectedRoute({ allowedRoles, children }) {
 
 export function homeForRole(role) {
   if (role === 'ADMIN') return '/admin';
-  if (role === 'OWNER') return '/owner';
-  if (role === 'BENEFICIARY') return '/beneficiary';
+  if (role === 'USER') return '/user';
   if (role === 'LAWYER') return '/lawyer';
   return '/login';
 }

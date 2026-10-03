@@ -136,7 +136,7 @@ function isAssignedLawyer(claim, userId) {
 
 function canReadClaim(claim, user) {
   if (user.role === 'ADMIN') return true;
-  if (user.role === 'BENEFICIARY') return isOwnerOfClaim(claim, user.id);
+  if (user.role === 'USER') return isOwnerOfClaim(claim, user.id);
   if (user.role === 'LAWYER') return isAssignedLawyer(claim, user.id);
   return false;
 }
@@ -539,7 +539,7 @@ export async function rejectLegacyClaim(
       .status(200)
       .json({
         message:
-          'Legacy Access Claim rejected. All beneficiary-uploaded documents and claim metadata were permanently deleted.',
+          'Legacy Access Claim rejected. All claimant-uploaded documents and claim metadata were permanently deleted.',
 
         deleted: true,
 

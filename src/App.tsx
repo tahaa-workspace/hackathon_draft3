@@ -7,30 +7,29 @@ import {
 } from 'react-router-dom';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
-
-import ProtectedRoute, {
-  homeForRole,
-} from './components/ProtectedRoute';
+import ProtectedRoute, { homeForRole } from './components/ProtectedRoute';
 
 import ContactUs from './pages/ContactUs';
 import LandingPage from './pages/LandingPage';
 import AboutUs from './pages/AboutUs';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
-import RegistrationChoice from './pages/RegistrationChoice';
 import Register from './pages/Register';
 import LawyerRegister from './pages/LawyerRegister';
 import PendingApproval from './pages/PendingApproval';
 import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLegacyClaims from './pages/AdminLegacyClaims';
-import OwnerDashboard from './pages/OwnerDashboard';
-import OwnerVault from './pages/OwnerVault';
-import BeneficiaryDashboard from './pages/BeneficiaryDashboard';
+import AdminAuditLogs from './pages/AdminAuditLogs';
+import UserDashboard from './pages/UserDashboard';
+import LegacyAccess from './pages/LegacyAccess';
+import Notifications from './pages/Notifications';
+import LegalAssistance from './pages/LegalAssistance';
+import LawyerConsultations from './pages/LawyerConsultations';
 import LawyerDashboard from './pages/LawyerDashboard';
 import Profile from './pages/Profile';
 
-type UserRole = 'ADMIN' | 'OWNER' | 'BENEFICIARY' | 'LAWYER';
+type UserRole = 'ADMIN' | 'USER' | 'LAWYER';
 
 type AuthUser = {
   id: string;
@@ -90,7 +89,6 @@ function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
     if (user.mustChangePassword) {
       return <Navigate to="/change-password?force=1" replace />;
     }
-
     return <Navigate to={homeForRole(user.role)} replace />;
   }
 
@@ -105,6 +103,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/contact" element={<ContactUs />} />
+
           <Route
             path="/login"
             element={
@@ -127,19 +126,12 @@ export default function App() {
             path="/register"
             element={
               <PublicOnlyRoute>
-                <RegistrationChoice />
-              </PublicOnlyRoute>
-            }
-          />
-
-          <Route
-            path="/register-owner"
-            element={
-              <PublicOnlyRoute>
                 <Register />
               </PublicOnlyRoute>
             }
           />
+
+          <Route path="/register-owner" element={<Navigate to="/register" replace />} />
 
           <Route
             path="/register-lawyer"
@@ -155,7 +147,7 @@ export default function App() {
           <Route
             path="/change-password"
             element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}>
+              <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'LAWYER']}>
                 <ChangePassword />
               </ProtectedRoute>
             }
@@ -164,8 +156,44 @@ export default function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'OWNER', 'BENEFICIARY', 'LAWYER']}>
+              <ProtectedRoute allowedRoles={['ADMIN', 'USER', 'LAWYER']}>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/user"
+            element={
+              <ProtectedRoute allowedRoles={['USER']}>
+                <UserDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/legacy-access"
+            element={
+              <ProtectedRoute allowedRoles={['USER']}>
+                <LegacyAccess />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/legal-assistance"
+            element={
+              <ProtectedRoute allowedRoles={['USER']}>
+                <LegalAssistance />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute allowedRoles={['USER', 'LAWYER', 'ADMIN']}>
+                <Notifications />
               </ProtectedRoute>
             }
           />
@@ -180,6 +208,15 @@ export default function App() {
           />
 
           <Route
+            path="/admin/audit-logs"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminAuditLogs />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/admin/*"
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
@@ -189,28 +226,10 @@ export default function App() {
           />
 
           <Route
-            path="/owner/vault"
+            path="/lawyer/consultations"
             element={
-              <ProtectedRoute allowedRoles={['OWNER']}>
-                <OwnerVault />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/owner"
-            element={
-              <ProtectedRoute allowedRoles={['OWNER']}>
-                <OwnerDashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/beneficiary"
-            element={
-              <ProtectedRoute allowedRoles={['BENEFICIARY']}>
-                <BeneficiaryDashboard />
+              <ProtectedRoute allowedRoles={['LAWYER']}>
+                <LawyerConsultations />
               </ProtectedRoute>
             }
           />
@@ -223,6 +242,9 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/owner/*" element={<Navigate to="/user" replace />} />
+          <Route path="/beneficiary/*" element={<Navigate to="/legacy-access" replace />} />
 
           <Route path="*" element={<SessionAwareRedirect />} />
         </Routes>

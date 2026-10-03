@@ -4,7 +4,6 @@ import {
     uploadDocument,
     getDocuments,
     getAssignedDocuments,
-    updateDocumentBeneficiaries,
     getDocumentAccessUrl,
     deleteDocument,
 } from "../controllers/documentController.js";
@@ -24,61 +23,48 @@ POST /api/documents
 router.post(
     "/",
     protect,
-    authorize("OWNER"),
+    authorize("USER"),
     upload.single("file"),
     uploadDocument
 );
 
 /*
 =================================
-GET OWNER DOCUMENTS
+GET USER-OWNED DOCUMENTS
 GET /api/documents
 =================================
 */
 router.get(
     "/",
     protect,
-    authorize("OWNER"),
+    authorize("USER"),
     getDocuments
 );
 
 /*
 =================================
-GET BENEFICIARY ASSIGNED DOCUMENTS
+GET LEGACY-ALLOCATED DOCUMENTS
 GET /api/documents/assigned-to-me
 =================================
 */
 router.get(
     "/assigned-to-me",
     protect,
-    authorize("BENEFICIARY"),
+    authorize("USER"),
     getAssignedDocuments
-);
-
-/*
-=================================
-UPDATE DOCUMENT BENEFICIARIES
-PUT /api/documents/:id/beneficiaries
-=================================
-*/
-router.put(
-    "/:id/beneficiaries",
-    protect,
-    authorize("OWNER"),
-    updateDocumentBeneficiaries
 );
 
 /*
 =================================
 ACCESS SINGLE DOCUMENT
 GET /api/documents/:id/access
-Owner OR explicitly assigned beneficiary
+Owner OR authorized legacy allocation recipient
 =================================
 */
 router.get(
     "/:id/access",
     protect,
-    authorize("OWNER", "BENEFICIARY"),
+    authorize("USER"),
     getDocumentAccessUrl
 );
 
@@ -86,14 +72,14 @@ router.get(
 
 /*
 =================================
-DELETE OWNER DOCUMENT
+DELETE USER-OWNED DOCUMENT
 DELETE /api/documents/:id
 =================================
 */
 router.delete(
     "/:id",
     protect,
-    authorize("OWNER"),
+    authorize("USER"),
     deleteDocument
 );
 export default router;
