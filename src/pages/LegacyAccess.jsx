@@ -11,12 +11,12 @@ import {
 } from 'lucide-react';
 
 import Navbar from '../components/Navbar';
+import SecureDocumentViewer from '../components/SecureDocumentViewer';
 import {
   downloadDocument,
   getIncomingAllocations,
   getLawyersForSelection,
   getMyLegacyClaims,
-  openDocument,
   selectClaimLawyer,
   submitLegacyClaim,
 } from '../services/legacyService';
@@ -75,6 +75,7 @@ export default function LegacyAccess() {
   const [lawyers, setLawyers] = useState([]);
   const [selectedLawyerByClaim, setSelectedLawyerByClaim] = useState({});
   const [lawyerLoadingId, setLawyerLoadingId] = useState(null);
+  const [previewDocument, setPreviewDocument] = useState(null);
 
   const [form, setForm] = useState({
     identityProofType: 'AADHAAR',
@@ -133,19 +134,14 @@ export default function LegacyAccess() {
     }
   };
 
-  const handleOpen = async (assetId) => {
-    try {
-      const blob = await openDocument(assetId);
-      const url = URL.createObjectURL(blob);
-      const windowRef = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!windowRef) {
-        URL.revokeObjectURL(url);
-        throw new Error('The browser blocked the document window.');
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (error) {
-      setMessage(error.message);
-    }
+  const handleOpen = (allocation) => {
+    setMessage('');
+    setPreviewDocument({
+      id: allocation.asset?.id,
+      title: allocation.asset?.title || 'Legacy document',
+      originalName: allocation.asset?.title || 'legacy-document',
+      fileType: allocation.asset?.fileType || '',
+    });
   };
 
   const assignLawyer = async (claimId) => {
@@ -331,7 +327,7 @@ export default function LegacyAccess() {
                         <>
                           <button
                             type="button"
-                            onClick={() => handleOpen(allocation.asset?.id)}
+                            onClick={() => handleOpen(allocation)}
                             className="btn-primary"
                           >
                             <Eye size={16} />
@@ -477,6 +473,13 @@ export default function LegacyAccess() {
           </div>
         )}
       </main>
+
+      {previewDocument && (
+        <SecureDocumentViewer
+          document={previewDocument}
+          onClose={() => setPreviewDocument(null)}
+        />
+      )}
     </div>
   );
 }
