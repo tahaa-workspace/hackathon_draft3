@@ -249,6 +249,31 @@ export async function markAllNotificationsRead() {
   });
 }
 
+export async function getAdminDocuments(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== '' && value != null)
+  );
+  return request(
+    '/admin/documents' + (query.toString() ? '?' + query.toString() : '')
+  );
+}
+
+export async function reviewAdminDocumentVerification(id, status, remarks = '') {
+  return request('/admin/documents/' + id + '/verification', {
+    method: 'PATCH',
+    body: { status, remarks },
+  });
+}
+
+export async function getAdminLegacyAllocations(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== '' && value != null)
+  );
+  return request(
+    '/admin/legacy-allocations' + (query.toString() ? '?' + query.toString() : '')
+  );
+}
+
 export async function getAdminAuditLogs(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== '' && value != null)
