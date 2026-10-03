@@ -8,8 +8,7 @@ import {
 
 const ROLE_LABELS = {
   ADMIN: "Administrator",
-  OWNER: "Owner",
-  BENEFICIARY: "Beneficiary",
+  USER: "User",
   LAWYER: "Lawyer",
 };
 
