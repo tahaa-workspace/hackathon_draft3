@@ -20,6 +20,7 @@ import {
   getNotifications,
   getUnreadNotificationCount,
   markNotificationRead,
+  markAllNotificationsRead,
 } from '../services/legacyService';
 
 const ROLE_META = {
@@ -74,6 +75,19 @@ export default function Navbar() {
       } catch {
         setRecent([]);
       }
+    }
+  };
+
+  const markAllFromPanel = async () => {
+    try {
+      await markAllNotificationsRead();
+      setUnread(0);
+      setRecent((items) =>
+        items.map((item) => ({ ...item, isRead: true }))
+      );
+      window.dispatchEvent(new Event('nextgen:notifications-changed'));
+    } catch {
+      // Keep the panel usable even if a background mark-all request fails.
     }
   };
 
@@ -231,18 +245,29 @@ export default function Navbar() {
 
             {notificationOpen && (
               <div className="absolute right-0 top-12 z-50 w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                   <p className="font-semibold text-slate-900">Notifications</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNotificationOpen(false);
-                      navigate('/notifications');
-                    }}
-                    className="text-xs font-semibold text-indigo-600"
-                  >
-                    View all
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {unread > 0 && (
+                      <button
+                        type="button"
+                        onClick={markAllFromPanel}
+                        className="text-xs font-semibold text-slate-500 hover:text-indigo-600"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotificationOpen(false);
+                        navigate('/notifications');
+                      }}
+                      className="text-xs font-semibold text-indigo-600"
+                    >
+                      View all
+                    </button>
+                  </div>
                 </div>
 
                 {recent.length === 0 ? (
