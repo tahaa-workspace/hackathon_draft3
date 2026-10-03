@@ -59,9 +59,7 @@ export async function submitContactMessage(req, res) {
     });
 
     const receiver =
-      process.env.CONTACT_RECEIVER_EMAIL ||
-      process.env.MAIL_USER ||
-      process.env.EMAIL_USER;
+      process.env.CONTACT_RECEIVER_EMAIL;
 
     let notificationSent = false;
 
