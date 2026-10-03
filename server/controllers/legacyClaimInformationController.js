@@ -2,6 +2,10 @@ import crypto from 'crypto';
 import streamifier from 'streamifier';
 import cloudinary from '../config/cloudinary.js';
 import LegacyClaim from '../models/LegacyClaim.js';
+import User from '../models/User.js';
+import { createNotification } from '../services/notificationService.js';
+import { claimStageTemplate } from '../services/emailTemplates.js';
+import { writeAudit } from '../services/auditService.js';
 
 function getEncryptionKey() {
   const configuredKey = process.env.DOCUMENT_ENCRYPTION_KEY;
@@ -402,165 +406,123 @@ export async function rejectLegacyClaim(
   res
 ) {
   try {
-    const remarks =
-      String(
-        req.body?.remarks || ''
-      ).trim();
+    const remarks = String(req.body?.remarks || '').trim();
 
     if (!remarks) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'A rejection reason is required.',
-        });
+      return res.status(400).json({
+        message: 'A rejection reason is required.',
+      });
     }
 
-    const claim =
-      await LegacyClaim.findById(
-        req.params.id
-      );
+    const claim = await LegacyClaim.findById(req.params.id);
 
     if (!claim) {
-      return res
-        .status(404)
-        .json({
-          message:
-            'Legacy Access Claim not found.',
-        });
+      return res.status(404).json({
+        message: 'Legacy Access Claim not found.',
+      });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | CHECK WHO IS REJECTING
-    |--------------------------------------------------------------------------
-    */
+    let rejectionSource;
 
-    if (
-      req.user.role === 'ADMIN'
-    ) {
-      if (
-        claim.status !==
-        'UNDER_ADMIN_REVIEW'
-      ) {
-        return res
-          .status(400)
-          .json({
-            message:
-              'Admin can reject only while the claim is under Admin review.',
-          });
+    if (req.user.role === 'ADMIN') {
+      if (claim.status !== 'UNDER_ADMIN_REVIEW') {
+        return res.status(400).json({
+          message: 'Admin can reject only while the claim is under Admin review.',
+        });
       }
 
-    } else if (
-      req.user.role === 'LAWYER'
-    ) {
-      if (
-        !isAssignedLawyer(
-          claim,
-          req.user.id
-        )
-      ) {
-        return res
-          .status(403)
-          .json({
-            message:
-              'This claim is not assigned to you.',
-          });
+      rejectionSource = 'Administrator';
+      claim.adminReview = {
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        remarks,
+      };
+    } else if (req.user.role === 'LAWYER') {
+      if (!isAssignedLawyer(claim, req.user.id)) {
+        return res.status(403).json({
+          message: 'This claim is not assigned to you.',
+        });
       }
 
-      if (
-        claim.status !==
-        'UNDER_LAWYER_REVIEW'
-      ) {
-        return res
-          .status(400)
-          .json({
-            message:
-              'Lawyer can reject only while the claim is under Lawyer review.',
-          });
+      if (!['UNDER_LAWYER_REVIEW', 'MORE_INFORMATION_REQUIRED'].includes(claim.status)) {
+        return res.status(400).json({
+          message: 'Lawyer can reject only while the claim is under Lawyer review.',
+        });
       }
 
+      rejectionSource = 'Lawyer';
+      claim.lawyerReview = {
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        remarks,
+        action: 'REJECT',
+      };
     } else {
-      return res
-        .status(403)
-        .json({
-          message:
-            'Only Admin or the assigned Lawyer can reject a claim.',
-        });
+      return res.status(403).json({
+        message: 'Only Admin or the assigned Lawyer can reject a claim.',
+      });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DELETE CLOUDINARY FILES
-    |--------------------------------------------------------------------------
-    */
+    claim.status = 'REJECTED_PLATFORM_CLAIM';
+    await claim.save();
 
-    try {
-      await deleteAllLegacyClaimFiles(
-        claim
-      );
-    } catch (deleteError) {
-      console.error(
-        'Legacy Claim Cloudinary deletion failed:',
-        deleteError
-      );
+    const claimant = await User.findById(claim.claimantId || claim.beneficiaryId)
+      .select('name email');
 
-      return res
-        .status(500)
-        .json({
+    if (claimant) {
+      const appUrl =
+        (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+          .replace(/\/$/, '') + '/legacy-access';
+
+      await createNotification({
+        req,
+        recipientId: claimant._id,
+        type: 'LEGACY_REJECTED',
+        title: 'Legacy access claim rejected',
+        message:
+          'Your legacy access claim was rejected by the ' +
+          rejectionSource.toLowerCase() +
+          '. Reason: ' + remarks,
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: claimant.email,
+        emailContent: claimStageTemplate({
+          recipientName: claimant.name,
+          subject: 'Legacy Access Claim Rejected – NextGen Vault',
           message:
-            'Claim rejection stopped because uploaded documents could not be deleted from Cloudinary.',
-
-          error:
-            deleteError.message,
-        });
+            'Your legacy access claim was rejected by the ' +
+            rejectionSource.toLowerCase() +
+            '. Reason: ' + remarks,
+          appUrl,
+        }),
+      });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DELETE CLAIM METADATA FROM MONGODB
-    |--------------------------------------------------------------------------
-    */
-
-    const claimId =
-      claim._id.toString();
-
-    await LegacyClaim.deleteOne({
-      _id: claim._id,
+    await writeAudit(req, {
+      action:
+        req.user.role === 'ADMIN'
+          ? 'ADMIN_LEGACY_CLAIM_REJECTED'
+          : 'LAWYER_LEGACY_CLAIM_REJECTED',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: rejectionSource + ' rejected a legacy access claim.',
+      metadata: {
+        reason: remarks,
+        allocationId: claim.allocationId?.toString() || null,
+      },
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | SUCCESS
-    |--------------------------------------------------------------------------
-    */
-
-    return res
-      .status(200)
-      .json({
-        message:
-          'Legacy Access Claim rejected. All claimant-uploaded documents and claim metadata were permanently deleted.',
-
-        deleted: true,
-
-        claimId,
-      });
-
+    return res.status(200).json({
+      message: 'Legacy Access Claim rejected and retained in claim history.',
+      deleted: false,
+      claimId: claim._id.toString(),
+      status: claim.status,
+    });
   } catch (error) {
-    console.error(
-      'Reject legacy claim error:',
-      error
-    );
-
-    return res
-      .status(500)
-      .json({
-        message:
-          'Unable to reject this Legacy Access Claim.',
-
-        error:
-          error.message,
-      });
+    console.error('Reject legacy claim error:', error);
+    return res.status(500).json({
+      message: 'Unable to reject this Legacy Access Claim.',
+    });
   }
 }
 
