@@ -5,6 +5,7 @@ import {
     getDocuments,
     getAssignedDocuments,
     getDocumentAccessUrl,
+    downloadDocument,
     deleteDocument,
 } from "../controllers/documentController.js";
 
@@ -66,6 +67,20 @@ router.get(
     protect,
     authorize("USER"),
     getDocumentAccessUrl
+);
+
+router.get(
+    "/:id/view",
+    protect,
+    authorize("USER"),
+    getDocumentAccessUrl
+);
+
+router.get(
+    "/:id/download",
+    protect,
+    authorize("USER"),
+    downloadDocument
 );
 
 
