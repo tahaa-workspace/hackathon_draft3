@@ -11,6 +11,7 @@ import {
   clearSession,
   loadStoredSession,
   loginUser,
+  logoutUser,
   persistSession,
 } from '../services/authService';
 
@@ -143,6 +144,8 @@ export function AuthProvider({
   const logout =
     useCallback(
       () => {
+
+        logoutUser().catch(() => {});
 
         clearSession();
 
