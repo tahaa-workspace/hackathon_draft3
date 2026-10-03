@@ -634,9 +634,6 @@ export async function getAadhaarReviewUrl(
       .json({
         message:
           'Unable to decrypt and display the Aadhaar document.',
-
-        error:
-          error.message,
       });
   }
 }
@@ -1104,9 +1101,6 @@ export async function rejectUser(
             resourceType,
 
             deliveryType,
-
-            error:
-              error.message,
           }
         );
 
