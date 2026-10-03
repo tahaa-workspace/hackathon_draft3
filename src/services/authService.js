@@ -323,39 +323,6 @@ export async function rejectUser(
 }
 
 /* =========================================================
-   BENEFICIARY
-   ========================================================= */
-
-export async function createBeneficiary({
-  name,
-  username,
-  email,
-  initialPassword,
-  aadhaar,
-}) {
-  const formData = new FormData();
-
-  formData.append('name', name);
-  formData.append('username', username);
-  formData.append('email', email);
-  formData.append('initialPassword', initialPassword);
-  formData.append('aadhaar', aadhaar);
-
-  return request(
-    '/beneficiaries',
-    {
-      method: 'POST',
-      body: formData,
-      isForm: true,
-    }
-  );
-}
-
-export async function listBeneficiaries() {
-  return request('/beneficiaries');
-}
-
-/* =========================================================
    SESSION MANAGEMENT
    ========================================================= */
 
