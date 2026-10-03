@@ -16,6 +16,7 @@ function triggerDownload(blob, filename) {
 
 export default function SecureDocumentViewer({
   document,
+  allowDownload = true,
   onClose,
 }) {
   const [url, setUrl] = useState('');
@@ -113,21 +114,23 @@ export default function SecureDocumentViewer({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={downloading}
-              className="btn-secondary"
-            >
-              {downloading ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <Download size={15} />
-              )}
-              <span className="hidden sm:inline">
-                {downloading ? 'Downloading…' : 'Download'}
-              </span>
-            </button>
+            {allowDownload && (
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="btn-secondary"
+              >
+                {downloading ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Download size={15} />
+                )}
+                <span className="hidden sm:inline">
+                  {downloading ? 'Downloading…' : 'Download'}
+                </span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -155,15 +158,21 @@ export default function SecureDocumentViewer({
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 {error}
               </p>
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={downloading}
-                className="btn-primary mt-5"
-              >
-                <Download size={16} />
-                Download file
-              </button>
+              {allowDownload ? (
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="btn-primary mt-5"
+                >
+                  <Download size={16} />
+                  Download file
+                </button>
+              ) : (
+                <p className="mt-4 text-xs text-slate-400">
+                  Download permission has not been granted for this allocation.
+                </p>
+              )}
             </div>
           ) : previewType === 'pdf' ? (
             <iframe
