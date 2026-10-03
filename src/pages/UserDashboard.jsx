@@ -14,12 +14,12 @@ import {
 } from 'lucide-react';
 
 import Navbar from '../components/Navbar';
+import SecureDocumentViewer from '../components/SecureDocumentViewer';
 import {
   createLegacyAllocation,
   deleteDocument,
   downloadDocument,
   getOutgoingAllocations,
-  openDocument,
   revokeLegacyAllocation,
   searchAllocationUsers,
 } from '../services/legacyService';
@@ -77,6 +77,7 @@ export default function UserDashboard() {
   const [recipient, setRecipient] = useState(null);
   const [searching, setSearching] = useState(false);
   const [allocating, setAllocating] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -144,20 +145,9 @@ export default function UserDashboard() {
     }
   };
 
-  const openOwnedDocument = async (document) => {
+  const openOwnedDocument = (document) => {
     setMessage('');
-    try {
-      const blob = await openDocument(document.id);
-      const url = URL.createObjectURL(blob);
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!popup) {
-        URL.revokeObjectURL(url);
-        throw new Error('The browser blocked the document preview window.');
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (error) {
-      setMessage(error.message || 'Unable to preview document.');
-    }
+    setPreviewDocument(document);
   };
 
   const downloadOwnedDocument = async (document) => {
@@ -477,6 +467,13 @@ export default function UserDashboard() {
           </div>
         </section>
       </main>
+
+      {previewDocument && (
+        <SecureDocumentViewer
+          document={previewDocument}
+          onClose={() => setPreviewDocument(null)}
+        />
+      )}
     </div>
   );
 }
