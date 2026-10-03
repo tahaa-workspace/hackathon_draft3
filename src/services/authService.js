@@ -88,7 +88,6 @@ export async function registerUser({
   name,
   username,
   email,
-  emailVerificationToken,
   phone,
   phoneVerificationToken,
   password,
@@ -100,7 +99,6 @@ export async function registerUser({
   formData.append('name', name);
   formData.append('username', username);
   formData.append('email', email);
-  formData.append('emailVerificationToken', emailVerificationToken);
   formData.append('phone', phone);
   formData.append('phoneVerificationToken', phoneVerificationToken);
   formData.append('password', password);
@@ -156,6 +154,20 @@ export async function registerLawyer({
     method: 'POST',
     body: formData,
     isForm: true,
+  });
+}
+
+export async function verifyRegistrationEmailLink(token) {
+  return request('/auth/verify-email', {
+    method: 'POST',
+    body: { token },
+  });
+}
+
+export async function resendRegistrationVerification(email) {
+  return request('/auth/resend-verification', {
+    method: 'POST',
+    body: { email },
   });
 }
 
