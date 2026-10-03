@@ -1415,9 +1415,6 @@ export async function createLegacyClaim(
       .json({
         message:
           'Failed to submit Legacy Access Claim.',
-
-        error:
-          error.message,
       });
   }
 }
