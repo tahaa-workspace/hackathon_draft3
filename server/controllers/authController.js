@@ -798,9 +798,6 @@ export const requestPasswordChangeOTP =
         return res.status(500).json({
             message:
                 "Failed to send verification OTP.",
-
-            error:
-                error.message,
         });
     }
 };
@@ -978,9 +975,6 @@ export const verifyPasswordChangeOTP =
         return res.status(500).json({
             message:
                 "Failed to verify OTP.",
-
-            error:
-                error.message,
         });
     }
 };
