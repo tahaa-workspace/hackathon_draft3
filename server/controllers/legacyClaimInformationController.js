@@ -132,7 +132,11 @@ function requestPayload(item) {
 }
 
 function isOwnerOfClaim(claim, userId) {
-  return claim.beneficiaryId?.toString() === userId;
+  const claimantId =
+    claim.claimantId ||
+    claim.beneficiaryId;
+
+  return claimantId?.toString() === userId;
 }
 
 function isAssignedLawyer(claim, userId) {
@@ -149,7 +153,7 @@ function canReadClaim(claim, user) {
 export async function getClaimInformationRequests(req, res) {
   try {
     const claim = await LegacyClaim.findById(req.params.id).select(
-      'beneficiaryId assignedLawyerId informationRequests'
+      'claimantId beneficiaryId assignedLawyerId informationRequests'
     );
     if (!claim) return res.status(404).json({ message: 'Legacy Access Claim not found.' });
     if (!canReadClaim(claim, req.user)) {
