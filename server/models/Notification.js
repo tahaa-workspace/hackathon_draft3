@@ -8,8 +8,14 @@ const notificationSchema = new Schema(
     type: {
       type: String,
       enum: [
+        'EMAIL_VERIFICATION',
         'LEGACY_ALLOCATION',
         'LEGACY_CLAIM',
+        'ADMIN_REVIEW',
+        'LAWYER_REVIEW',
+        'LEGACY_APPROVED',
+        'LEGACY_REJECTED',
+        'LEGACY_UNLOCKED',
         'LEGACY_RELEASE',
         'DOCUMENT_VERIFICATION',
         'LEGAL_REQUEST',
