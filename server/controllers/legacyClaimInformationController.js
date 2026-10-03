@@ -632,6 +632,18 @@ export async function getAdditionalEvidenceFile(req, res) {
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${String(file.originalName || 'evidence').replace(/"/g, '')}"`);
     res.setHeader('Cache-Control', 'private, no-store');
+
+    await writeAudit(req, {
+      action: 'LEGACY_CLAIM_EVIDENCE_VIEWED',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: 'Authorized user viewed additional legacy claim evidence.',
+      metadata: {
+        informationRequestId: infoRequest._id.toString(),
+        fileIndex: index,
+      },
+    });
+
     return res.send(decrypted);
   } catch (error) {
     console.error('Open additional evidence error:', error);
