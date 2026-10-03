@@ -29,6 +29,28 @@ function brandedLayout({ title, intro, body, actionUrl, actionLabel }) {
   `;
 }
 
+export function registrationVerificationLinkTemplate({ name = 'there', verificationUrl }) {
+  return {
+    subject: 'Verify Your Email – NextGen Vault',
+    text: `Hello ${name},
+
+Verify your NextGen Vault email address using this link:
+${verificationUrl}
+
+This link expires in 30 minutes and can be used only once.
+
+Regards,
+NextGen Vault`,
+    html: brandedLayout({
+      title: 'Verify your email',
+      intro: `Hello ${name}, verify your email address to complete your NextGen Vault account verification.`,
+      body: '<p>This verification link expires in <strong>30 minutes</strong> and can be used only once.</p>',
+      actionUrl: verificationUrl,
+      actionLabel: 'Verify Email',
+    }),
+  };
+}
+
 export function registrationOtpTemplate({ name = 'there', otp }) {
   return {
     subject: 'Verify Your Email – NextGen Vault',
