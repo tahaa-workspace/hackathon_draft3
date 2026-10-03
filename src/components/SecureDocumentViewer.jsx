@@ -197,15 +197,21 @@ export default function SecureDocumentViewer({
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 This file type cannot be previewed in the browser. You can still download it securely.
               </p>
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={downloading}
-                className="btn-primary mt-5"
-              >
-                <Download size={16} />
-                Download file
-              </button>
+              {allowDownload ? (
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="btn-primary mt-5"
+                >
+                  <Download size={16} />
+                  Download file
+                </button>
+              ) : (
+                <p className="mt-4 text-xs text-slate-400">
+                  Download permission has not been granted for this allocation.
+                </p>
+              )}
             </div>
           )}
         </div>
