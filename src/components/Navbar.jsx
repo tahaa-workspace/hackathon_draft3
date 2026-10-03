@@ -36,11 +36,23 @@ export default function Navbar() {
   const [recent, setRecent] = useState([]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) return undefined;
 
-    getUnreadNotificationCount()
-      .then((data) => setUnread(data.count || 0))
-      .catch(() => {});
+    const refreshUnread = () => {
+      getUnreadNotificationCount()
+        .then((data) => setUnread(data.count || 0))
+        .catch(() => {});
+    };
+
+    refreshUnread();
+
+    const timer = window.setInterval(refreshUnread, 30000);
+    window.addEventListener('nextgen:notifications-changed', refreshUnread);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('nextgen:notifications-changed', refreshUnread);
+    };
   }, [user]);
 
   if (!user) return null;
