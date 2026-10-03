@@ -272,7 +272,6 @@ export async function updateUserStatus(
     if (
       ![
         'USER',
-        'USER',
         'LAWYER',
       ].includes(
         user.role
@@ -302,45 +301,99 @@ export async function updateUserStatus(
         });
     }
 
+    if (
+      status === 'ACTIVE' &&
+      user.role === 'USER' &&
+      !user.emailVerified
+    ) {
+      return res
+        .status(409)
+        .json({
+          message:
+            'This user must verify their email address before the account can be activated.',
+        });
+    }
+
+    if (
+      user.status === status
+    ) {
+      return res
+        .status(200)
+        .json({
+          message:
+            status === 'ACTIVE'
+              ? 'Account is already active.'
+              : 'Account is already suspended.',
+
+          user:
+            accountPayload(
+              user
+            ),
+        });
+    }
+
     user.status =
       status;
 
     await user.save();
 
-    const appUrl =
-      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
-        .replace(/\/$/, '') + '/login';
+    const isActive =
+      status === 'ACTIVE';
 
-    try {
-      await sendTransactionalEmail({
-        to: user.email,
-        ...claimStageTemplate({
-          recipientName: user.name || user.username,
-          subject: 'Your NextGen Vault Account Has Been Approved',
-          message:
-            user.role === 'LAWYER'
-              ? 'Your lawyer account has been approved and is now active.'
-              : 'Your account has been approved. You can sign in after your email address is verified.',
-          appUrl,
-        }),
-      });
-    } catch (mailError) {
-      console.error('Account approval email failed:', mailError.message);
-    }
+    const message =
+      isActive
+        ? 'Your NextGen Vault account is active again. You may sign in normally.'
+        : 'Your NextGen Vault account has been suspended. Contact an administrator if you believe this is an error.';
+
+    await createNotification({
+      req,
+      recipientId: user._id,
+      type: 'SECURITY',
+      title:
+        isActive
+          ? 'Account activated'
+          : 'Account suspended',
+      message,
+      relatedEntityType: 'User',
+      relatedEntityId: user._id,
+      email: user.email,
+      emailContent: claimStageTemplate({
+        recipientName:
+          user.name ||
+          user.username,
+        subject:
+          isActive
+            ? 'Account Activated – NextGen Vault'
+            : 'Account Suspended – NextGen Vault',
+        message,
+        appUrl:
+          (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+            .replace(/\/$/, '') + '/login',
+      }),
+    });
 
     await writeAudit(req, {
-      action: 'ACCOUNT_APPROVED',
+      action:
+        isActive
+          ? 'ACCOUNT_ACTIVATED'
+          : 'ACCOUNT_SUSPENDED',
       entityType: 'User',
       entityId: user._id,
-      description: 'Administrator approved a pending account.',
-      metadata: { role: user.role },
+      description:
+        isActive
+          ? 'Administrator activated an account.'
+          : 'Administrator suspended an account.',
+      metadata: {
+        role:
+          user.role,
+      },
     });
 
     return res
       .status(200)
       .json({
         message:
-          status === 'ACTIVE'
+          isActive
             ? 'Account activated successfully.'
             : 'Account suspended successfully.',
 
