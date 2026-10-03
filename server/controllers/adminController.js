@@ -1269,6 +1269,41 @@ export async function reviewDocumentVerification(req, res) {
     document.verificationReviewedAt = new Date();
     await document.save();
 
+    const owner =
+      await User.findById(
+        document.ownerId
+      ).select(
+        'name email'
+      );
+
+    if (owner) {
+      const statusMessage =
+        'The technical verification status for "' +
+        document.title +
+        '" is now ' +
+        status +
+        '. This technical status does not establish legal authenticity.';
+
+      await createNotification({
+        req,
+        recipientId: owner._id,
+        type: 'DOCUMENT_VERIFICATION',
+        title: 'Document verification updated',
+        message: statusMessage,
+        relatedEntityType: 'Document',
+        relatedEntityId: document._id,
+        email: owner.email,
+        emailContent: claimStageTemplate({
+          recipientName: owner.name || 'there',
+          subject: 'Document Verification Updated – NextGen Vault',
+          message: statusMessage,
+          appUrl:
+            (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+              .replace(/\/$/, '') + '/user',
+        }),
+      });
+    }
+
     await writeAudit(req, {
       action: 'DOCUMENT_VERIFICATION_REVIEWED',
       entityType: 'Document',
