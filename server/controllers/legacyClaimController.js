@@ -1462,6 +1462,7 @@ export async function listApprovedLawyers(
       await User.find({
         role: 'LAWYER',
         status: 'ACTIVE',
+        'lawyerProfile.isAvailable': { $ne: false },
       })
         .sort({
           'lawyerProfile.isAvailable': -1,
@@ -1733,9 +1734,16 @@ export async function selectClaimLawyer(
     const claim =
       await LegacyClaim.findOne({
         _id: req.params.id,
-
-        beneficiaryId:
-          req.user.id,
+        $or: [
+          {
+            claimantId:
+              req.user.id,
+          },
+          {
+            beneficiaryId:
+              req.user.id,
+          },
+        ],
       });
 
     if (!claim) {
@@ -1744,6 +1752,29 @@ export async function selectClaimLawyer(
         .json({
           message:
             'Legacy Access Claim not found.',
+        });
+    }
+
+    const allocation =
+      claim.allocationId
+        ? await LegacyAllocation.findOne({
+            _id:
+              claim.allocationId,
+            allocatedTo:
+              req.user.id,
+            status: {
+              $ne:
+                'REVOKED',
+            },
+          })
+        : null;
+
+    if (!allocation) {
+      return res
+        .status(403)
+        .json({
+          message:
+            'This claim is not linked to an active legacy allocation assigned to your account.',
         });
     }
 
