@@ -1771,6 +1771,64 @@ export async function selectClaimLawyer(
 
     await claim.save();
 
+    const claimant =
+      await User.findById(req.user.id)
+        .select('name email');
+
+    const appBase =
+      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+        .replace(/\/$/, '');
+
+    await createNotification({
+      req,
+      recipientId: lawyer._id,
+      type: 'LAWYER_REVIEW',
+      title: 'Legacy claim assigned for review',
+      message:
+        'A legacy access claim has been assigned to you for legal review.',
+      relatedEntityType: 'LegacyClaim',
+      relatedEntityId: claim._id,
+      email: lawyer.email,
+      emailContent: claimStageTemplate({
+        recipientName: lawyer.name,
+        subject: 'Legacy Claim Assigned for Lawyer Review – NextGen Vault',
+        message:
+          'A legacy access claim has been assigned to you for legal review.',
+        appUrl: appBase + '/lawyer',
+      }),
+    });
+
+    if (claimant) {
+      await createNotification({
+        req,
+        recipientId: claimant._id,
+        type: 'LAWYER_REVIEW',
+        title: 'Lawyer review started',
+        message:
+          'Your legacy access claim is now under lawyer review.',
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: claimant.email,
+        emailContent: claimStageTemplate({
+          recipientName: claimant.name,
+          subject: 'Legacy Claim Under Lawyer Review – NextGen Vault',
+          message:
+            'Your legacy access claim is now under lawyer review.',
+          appUrl: appBase + '/legacy-access',
+        }),
+      });
+    }
+
+    await writeAudit(req, {
+      action: 'LAWYER_ASSIGNED_TO_LEGACY_CLAIM',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: 'Claimant selected an available lawyer for a legacy claim.',
+      metadata: {
+        lawyerId: lawyer._id.toString(),
+      },
+    });
+
     const populated =
       await populatedClaim(
         LegacyClaim.findById(
