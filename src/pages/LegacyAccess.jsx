@@ -49,22 +49,6 @@ function claimProgress(status) {
   };
 }
 
-function canAccessWithoutClaim(allocation) {
-  if (allocation.status === 'RELEASED' || allocation.releaseCondition === 'IMMEDIATE') {
-    return true;
-  }
-
-  if (
-    allocation.releaseCondition === 'DATE' &&
-    allocation.releaseDate &&
-    new Date(allocation.releaseDate) <= new Date()
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 export default function LegacyAccess() {
   const [allocations, setAllocations] = useState([]);
   const [claims, setClaims] = useState([]);
@@ -252,9 +236,11 @@ export default function LegacyAccess() {
           <div className="space-y-4">
             {allocations.map((allocation) => {
               const claim = claimForAllocation(claims, allocation.id);
-              const directlyAccessible = canAccessWithoutClaim(allocation);
-              const claimApproved = claim?.status === 'APPROVED_INFORMATION_RELEASED';
-              const canOpen = directlyAccessible || claimApproved;
+              const claimApproved =
+                claim?.status === 'APPROVED_INFORMATION_RELEASED';
+              const canOpen =
+                allocation.status === 'RELEASED' &&
+                claimApproved;
 
               return (
                 <article key={allocation.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -389,7 +375,7 @@ export default function LegacyAccess() {
                         </div>
                       )}
 
-                      {!canOpen && !claim && allocation.releaseCondition === 'LEGACY_CLAIM' && (
+                      {!canOpen && !claim && allocation.status !== 'REVOKED' && (
                         <button
                           type="button"
                           onClick={() => setClaimingId((current) => current === allocation.id ? null : allocation.id)}
@@ -477,6 +463,12 @@ export default function LegacyAccess() {
       {previewDocument && (
         <SecureDocumentViewer
           document={previewDocument}
+          allowDownload={
+            allocations.find(
+              (allocation) =>
+                allocation.asset?.id === previewDocument.id
+            )?.permissions?.download !== false
+          }
           onClose={() => setPreviewDocument(null)}
         />
       )}
