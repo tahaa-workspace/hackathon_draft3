@@ -375,7 +375,9 @@ export default function LegacyAccess() {
                         </div>
                       )}
 
-                      {!canOpen && !claim && allocation.status !== 'REVOKED' && (
+                      {!canOpen &&
+                        !claim &&
+                        !['REVOKED', 'EXPIRED'].includes(allocation.status) && (
                         <button
                           type="button"
                           onClick={() => setClaimingId((current) => current === allocation.id ? null : allocation.id)}
