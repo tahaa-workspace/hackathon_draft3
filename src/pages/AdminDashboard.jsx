@@ -303,7 +303,7 @@ export default function AdminDashboard() {
     const label =
       item.role === 'LAWYER'
         ? 'lawyer'
-        : 'owner';
+        : 'user';
 
     const confirmed = window.confirm(
       `Approve this ${label} registration?`
@@ -328,7 +328,7 @@ export default function AdminDashboard() {
     const label =
       item.role === 'LAWYER'
         ? 'lawyer'
-        : 'owner';
+        : 'user';
 
     const documentLabel =
       item.role === 'LAWYER'
