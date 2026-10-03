@@ -9,6 +9,7 @@ import LegacyAllocation from '../models/LegacyAllocation.js';
 import { createNotification } from '../services/notificationService.js';
 import { claimStageTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
+import { validateUploadedFile } from '../services/fileValidationService.js';
 
 /*
 |--------------------------------------------------------------------------
@@ -1055,6 +1056,29 @@ export async function createLegacyClaim(
   const supportFile =
     req.files
       ?.supportingDocument?.[0];
+
+  const evidenceFiles =
+    [
+      deathFile,
+      identityFile,
+      supportFile,
+    ].filter(Boolean);
+
+  for (const file of evidenceFiles) {
+    const validation =
+      validateUploadedFile(
+        file
+      );
+
+    if (!validation.valid) {
+      return res
+        .status(400)
+        .json({
+          message:
+            validation.message,
+        });
+    }
+  }
 
   const {
     identityProofType,
