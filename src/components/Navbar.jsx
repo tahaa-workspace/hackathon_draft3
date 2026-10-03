@@ -92,8 +92,34 @@ export default function Navbar() {
 
     setNotificationOpen(false);
 
-    if (item.type === 'LEGACY_ALLOCATION' || item.type === 'LEGACY_RELEASE') {
-      navigate('/legacy-access');
+    const legacyTypes = new Set([
+      'LEGACY_ALLOCATION',
+      'LEGACY_CLAIM',
+      'ADMIN_REVIEW',
+      'LAWYER_REVIEW',
+      'LEGACY_APPROVED',
+      'LEGACY_REJECTED',
+      'LEGACY_UNLOCKED',
+      'LEGACY_RELEASE',
+    ]);
+
+    if (legacyTypes.has(item.type)) {
+      if (user.role === 'ADMIN') {
+        navigate('/admin/legacy-claims');
+      } else if (user.role === 'LAWYER') {
+        navigate('/lawyer');
+      } else {
+        navigate('/legacy-access');
+      }
+      return;
+    }
+
+    if (item.type === 'LEGAL_REQUEST') {
+      navigate(
+        user.role === 'LAWYER'
+          ? '/lawyer/consultations'
+          : '/legal-assistance'
+      );
       return;
     }
 
