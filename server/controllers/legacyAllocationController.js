@@ -2,7 +2,8 @@ import LegacyAllocation from '../models/LegacyAllocation.js';
 import Document from '../models/Document.js';
 import User from '../models/User.js';
 import Notification from '../models/Notification.js';
-import transporter from '../config/mailer.js';
+import { sendTransactionalEmail } from '../services/mailService.js';
+import { legacyAllocationTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
 
 function allocationPayload(allocation) {
@@ -161,16 +162,25 @@ export async function createLegacyAllocation(req, res) {
     });
 
     try {
-      await transporter.sendMail({
-        from: { name: 'NextGen Vault', address: process.env.EMAIL_USER },
+      const appUrl =
+        (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+          .replace(/\/$/, '') + '/legacy-access';
+
+      const emailContent = legacyAllocationTemplate({
+        recipientName: recipient.name,
+        allocatorName: sender?.name || 'A user',
+        assetName: asset.title,
+        allocationDate: new Date(allocation.createdAt).toLocaleString('en-IN'),
+        status:
+          allocation.releaseCondition === 'LEGACY_CLAIM'
+            ? 'Locked / Awaiting Claim'
+            : allocation.status,
+        appUrl,
+      });
+
+      await sendTransactionalEmail({
         to: recipient.email,
-        subject: 'A New Legacy Asset Has Been Allocated to You',
-        text:
-          'Hello ' + recipient.name + ',\n\n' +
-          (sender?.name || 'A user') + ' has allocated a legacy asset to your NextGen Vault account.\n\n' +
-          'Asset: ' + asset.title + '\n\n' +
-          'The asset is currently protected. Open Legacy Access in your account to review the allocation and initiate the required claim process when eligible.\n\n' +
-          'Regards,\nNextGen Vault',
+        ...emailContent,
       });
 
       notification.emailSent = true;
