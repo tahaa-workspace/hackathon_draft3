@@ -26,9 +26,6 @@ function documentPayload(document) {
         fileSize: document.fileSize,
         sha256: document.sha256 || null,
         verificationStatus: document.verificationStatus || "PENDING",
-        assignedBeneficiaryIds: (document.assignedBeneficiaries || []).map((id) =>
-            id.toString()
-        ),
         createdAt: document.createdAt,
         updatedAt: document.updatedAt,
     };
@@ -351,7 +348,7 @@ async function resolveDocumentAuthorization(document, userId, requireDownload = 
     const allocation = await LegacyAllocation.findOne({
         assetId: document._id,
         allocatedTo: userId,
-        status: { $ne: "REVOKED" },
+        status: { $nin: ["REVOKED", "EXPIRED"] },
     });
 
     if (!allocation) {
@@ -366,33 +363,27 @@ async function resolveDocumentAuthorization(document, userId, requireDownload = 
         return { allowed: false, isOwner: false, allocation };
     }
 
-    if (allocation.releaseCondition === "IMMEDIATE" || allocation.status === "RELEASED") {
-        return { allowed: true, isOwner: false, allocation };
-    }
+    /*
+    =========================================================================
+    ALLOCATION DOES NOT EQUAL FILE ACCESS
+    =========================================================================
+    The allocation only designates the recipient. A matching approved claim
+    and a RELEASED allocation are both required before document bytes leave
+    the backend.
+    */
+    const approvedClaim = await LegacyClaim.exists({
+        allocationId: allocation._id,
+        claimantId: userId,
+        status: "APPROVED_INFORMATION_RELEASED",
+    });
 
-    if (
-        allocation.releaseCondition === "DATE" &&
-        allocation.releaseDate &&
-        new Date(allocation.releaseDate) <= new Date()
-    ) {
-        return { allowed: true, isOwner: false, allocation };
-    }
-
-    if (allocation.releaseCondition === "LEGACY_CLAIM") {
-        const approvedClaim = await LegacyClaim.exists({
-            allocationId: allocation._id,
-            claimantId: userId,
-            status: "APPROVED_INFORMATION_RELEASED",
-        });
-
-        return {
-            allowed: Boolean(approvedClaim),
-            isOwner: false,
-            allocation,
-        };
-    }
-
-    return { allowed: false, isOwner: false, allocation };
+    return {
+        allowed:
+            allocation.status === "RELEASED" &&
+            Boolean(approvedClaim),
+        isOwner: false,
+        allocation,
+    };
 }
 
 async function streamAuthorizedDocument(req, res, disposition = "inline") {
