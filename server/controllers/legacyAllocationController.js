@@ -1,10 +1,10 @@
 import LegacyAllocation from '../models/LegacyAllocation.js';
 import Document from '../models/Document.js';
 import User from '../models/User.js';
-import Notification from '../models/Notification.js';
-import { sendTransactionalEmail } from '../services/mailService.js';
 import { legacyAllocationTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
+import { createNotification } from '../services/notificationService.js';
+import { claimStageTemplate } from '../services/emailTemplates.js';
 
 function allocationPayload(allocation) {
   return {
@@ -154,29 +154,24 @@ export async function createLegacyAllocation(req, res) {
       status: releaseCondition === 'IMMEDIATE' ? 'RELEASED' : 'ACTIVE',
     });
 
-    const notification = await Notification.create({
+    const appUrl =
+      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+        .replace(/\/$/, '') + '/legacy-access';
+
+    await createNotification({
+      req,
       recipientId: recipient._id,
       type: 'LEGACY_ALLOCATION',
       title: 'New Legacy Asset Allocated',
-      message: (sender?.name || 'A user') + ' has allocated "' + asset.title + '" to you. The asset is protected; open Legacy Access to review its status and claim requirements.',
+      message:
+        (sender?.name || 'A user') +
+        ' has allocated "' +
+        asset.title +
+        '" to you. The asset is protected; open Legacy Access to review its status and claim requirements.',
       relatedEntityType: 'LegacyAllocation',
       relatedEntityId: allocation._id,
-    });
-
-    await writeAudit(req, {
-      action: 'LEGACY_ALLOCATION_CREATED',
-      entityType: 'LegacyAllocation',
-      entityId: allocation._id,
-      description: 'Legacy asset allocated to ' + recipient.email + '.',
-      metadata: { assetId: asset._id.toString(), recipientId: recipient._id.toString() },
-    });
-
-    try {
-      const appUrl =
-        (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
-          .replace(/\/$/, '') + '/legacy-access';
-
-      const emailContent = legacyAllocationTemplate({
+      email: recipient.email,
+      emailContent: legacyAllocationTemplate({
         recipientName: recipient.name,
         allocatorName: sender?.name || 'A user',
         assetName: asset.title,
@@ -186,34 +181,16 @@ export async function createLegacyAllocation(req, res) {
             ? 'Locked / Awaiting Claim'
             : allocation.status,
         appUrl,
-      });
+      }),
+    });
 
-      await sendTransactionalEmail({
-        to: recipient.email,
-        ...emailContent,
-      });
-
-      notification.emailSent = true;
-      notification.emailSentAt = new Date();
-      await notification.save();
-
-      await writeAudit(req, {
-        action: 'EMAIL_SENT',
-        entityType: 'Notification',
-        entityId: notification._id,
-        description: 'Legacy allocation email sent successfully.',
-      });
-    } catch (mailError) {
-      console.error('Legacy allocation email failed:', mailError);
-      await writeAudit(req, {
-        action: 'EMAIL_FAILED',
-        entityType: 'Notification',
-        entityId: notification._id,
-        description: 'Legacy allocation email delivery failed.',
-        metadata: { reason: mailError.message },
-        status: 'FAILED',
-      });
-    }
+    await writeAudit(req, {
+      action: 'LEGACY_ALLOCATION_CREATED',
+      entityType: 'LegacyAllocation',
+      entityId: allocation._id,
+      description: 'Legacy asset allocated to ' + recipient.email + '.',
+      metadata: { assetId: asset._id.toString(), recipientId: recipient._id.toString() },
+    });
 
     const populated = await populate(LegacyAllocation.findById(allocation._id));
     return res.status(201).json({
@@ -259,13 +236,26 @@ export async function revokeLegacyAllocation(req, res) {
   allocation.revokedAt = new Date();
   await allocation.save();
 
-  await Notification.create({
+  const appUrl =
+    (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+      .replace(/\/$/, '') + '/legacy-access';
+
+  await createNotification({
+    req,
     recipientId: allocation.allocatedTo._id,
     type: 'LEGACY_ALLOCATION',
     title: 'Legacy Allocation Revoked',
     message: 'A legacy allocation previously assigned to you has been revoked.',
     relatedEntityType: 'LegacyAllocation',
     relatedEntityId: allocation._id,
+    email: allocation.allocatedTo.email,
+    emailContent: claimStageTemplate({
+      recipientName: allocation.allocatedTo.name || 'there',
+      subject: 'Legacy Allocation Revoked – NextGen Vault',
+      message:
+        'A legacy allocation previously assigned to you has been revoked. Sign in to Legacy Access to review your current allocations.',
+      appUrl,
+    }),
   });
 
   await writeAudit(req, {
