@@ -1,11 +1,12 @@
 import AuditLog from '../models/AuditLog.js';
 
 export async function listAuditLogs(req, res) {
-  const { action, entityType, status, actorId, from, to } = req.query;
+  const { action, entityType, entityId, status, actorId, from, to } = req.query;
   const filter = {};
 
   if (action) filter.action = action;
   if (entityType) filter.entityType = entityType;
+  if (entityId) filter.entityId = entityId;
   if (status) filter.status = status;
   if (actorId) filter.actorId = actorId;
   if (from || to) {
