@@ -35,7 +35,7 @@ export const problems = [
     number: "04",
     icon: Users,
     title: "No digital legacy workflow",
-    text: "Traditional storage tools focus on files, not ownership, beneficiaries and controlled legacy access.",
+    text: "Traditional storage tools focus on files, not user-to-user allocations, claim verification and controlled legacy access.",
   },
 ];
 
@@ -49,30 +49,30 @@ export const features = [
   },
   {
     icon: Users,
-    title: "Trusted Beneficiaries",
+    title: "Trusted Legacy Recipients",
     description:
-      "Create beneficiary accounts for the people you trust without making your information public.",
+      "Allocate selected documents to trusted existing users without making your information public.",
     tone: "violet",
   },
   {
     icon: UserRoundCheck,
     title: "Document-Level Access",
     description:
-      "Choose exactly which beneficiary can access each document. Adding someone never exposes the entire vault.",
+      "Choose exactly which recipient can receive each document. An allocation never exposes the entire vault.",
     tone: "cyan",
   },
   {
     icon: UserCheck,
-    title: "Verified Owners",
+    title: "Verified Users",
     description:
-      "Owner registrations can pass through an administrator verification process before activation.",
+      "User registrations pass through email verification and administrator review before activation.",
     tone: "green",
   },
   {
     icon: ShieldCheck,
     title: "Role-Based Security",
     description:
-      "Separate Owner, Beneficiary and Administrator permissions protect sensitive platform actions.",
+      "USER, ADMIN and LAWYER roles combine with resource-level ownership and allocation checks to protect sensitive actions.",
     tone: "amber",
   },
   {
@@ -89,13 +89,13 @@ export const steps = [
     number: "01",
     title: "Create your account",
     description:
-      "Register as an Owner and provide the information required for verification.",
+      "Create one user account and provide the information required for verification.",
   },
   {
     number: "02",
     title: "Get verified",
     description:
-      "The Administrator reviews the registration before the Owner account becomes active.",
+      "Verify your email and complete Administrator review before the account becomes active.",
   },
   {
     number: "03",
@@ -107,7 +107,7 @@ export const steps = [
     number: "04",
     title: "Control access",
     description:
-      "Create beneficiaries and choose exactly which documents each person can access.",
+      "Allocate selected documents to existing users and keep each allocation locked behind its claim workflow."
   },
 ];
 
