@@ -860,8 +860,8 @@ export default function AdminDashboard() {
                                 handleReject(item)
                               }
                               disabled={
-                                actionLoadingId === item.id ||
-                                (item.role === 'USER' && !item.emailVerified)
+                                actionLoadingId ===
+                                item.id
                               }
                               className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                             >
@@ -875,8 +875,8 @@ export default function AdminDashboard() {
                                 handleApprove(item)
                               }
                               disabled={
-                                actionLoadingId ===
-                                item.id
+                                actionLoadingId === item.id ||
+                                (item.role === 'USER' && !item.emailVerified)
                               }
                               className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-800 disabled:opacity-50"
                             >
