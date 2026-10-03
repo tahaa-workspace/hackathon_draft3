@@ -5,6 +5,7 @@ import {
     requestPasswordChangeOTP,
     verifyPasswordChangeOTP,
     completePasswordChange,
+    logout,
 } from "../controllers/authController.js";
 
 import { registerLawyer } from "../controllers/lawyerRegistrationController.js";
@@ -96,6 +97,12 @@ LOGIN
 router.post(
     "/login",
     login
+);
+
+router.post(
+    "/logout",
+    protect,
+    logout
 );
 
 /*
