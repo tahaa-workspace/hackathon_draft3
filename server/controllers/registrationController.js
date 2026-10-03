@@ -7,7 +7,8 @@ import RegistrationPhoneVerification from '../models/RegistrationPhoneVerificati
 import RegistrationEmailVerification from '../models/RegistrationEmailVerification.js';
 
 import { sendTransactionalEmail } from '../services/mailService.js';
-import { registrationOtpTemplate } from '../services/emailTemplates.js';
+import { writeAudit } from '../services/auditService.js';
+import { registrationOtpTemplate, registrationVerificationLinkTemplate } from '../services/emailTemplates.js';
 
 import {
   encryptAadhaarBuffer,
@@ -35,6 +36,9 @@ const OTP_EXPIRY_MS =
 
 const VERIFICATION_PROOF_EXPIRY_MS =
   10 * 60 * 1000;
+
+const EMAIL_LINK_EXPIRY_MS =
+  30 * 60 * 1000;
 
 const OTP_RESEND_COOLDOWN_MS =
   60 * 1000;
@@ -132,6 +136,70 @@ function hashToken(token) {
     )
     .update(token)
     .digest('hex');
+}
+
+function getFrontendBaseUrl() {
+  return String(
+    process.env.APP_BASE_URL ||
+    process.env.FRONTEND_URL ||
+    'http://localhost:5173'
+  ).replace(/\/$/, '');
+}
+
+async function createEmailVerificationSession(user) {
+  const token =
+    crypto
+      .randomBytes(32)
+      .toString('hex');
+
+  const expiresAt =
+    new Date(
+      Date.now() +
+      EMAIL_LINK_EXPIRY_MS
+    );
+
+  await RegistrationEmailVerification.findOneAndUpdate(
+    { email: user.email },
+    {
+      $set: {
+        otpHash: null,
+        attempts: 0,
+        lastSentAt: new Date(),
+        tokenHash: hashToken(token),
+        verifiedAt: null,
+        expiresAt,
+      },
+      $inc: {
+        resendCount: 1,
+      },
+    },
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+    }
+  );
+
+  const verificationUrl =
+    getFrontendBaseUrl() +
+    '/verify-email?token=' +
+    encodeURIComponent(token);
+
+  const content =
+    registrationVerificationLinkTemplate({
+      name: user.name || user.username,
+      verificationUrl,
+    });
+
+  await sendTransactionalEmail({
+    to: user.email,
+    ...content,
+  });
+
+  return {
+    expiresAt,
+    verificationUrl,
+  };
 }
 
 
@@ -1116,25 +1184,15 @@ export async function registerOwner(
   req,
   res
 ) {
-
   const {
     name,
     username,
-
-    email:
-      rawEmail,
-
-    emailVerificationToken,
-
-    phone:
-      rawPhone,
-
+    email: rawEmail,
+    phone: rawPhone,
     phoneVerificationToken,
-
     password,
     confirmPassword,
   } = req.body;
-
 
   const phone =
     normalizePhone(
@@ -1146,39 +1204,28 @@ export async function registerOwner(
       rawEmail
     );
 
-
-  /*
-  =========================================
-  REQUIRED FIELDS
-  =========================================
-  */
-
   if (
     !name ||
     !username ||
     !email ||
-    !emailVerificationToken ||
     !phone ||
     !phoneVerificationToken ||
     !password ||
     !confirmPassword
   ) {
-
     return res
       .status(400)
       .json({
         message:
-          'All fields, including email and mobile verification, are required.',
+          'Name, username, email, verified mobile number, password, and confirmation are required.',
       });
   }
-
 
   if (
     !isValidEmail(
       email
     )
   ) {
-
     return res
       .status(400)
       .json({
@@ -1187,30 +1234,20 @@ export async function registerOwner(
       });
   }
 
-
   if (
     !isAllowedDemoMobile(
       phone
     )
   ) {
-
     return res
       .status(400)
       .json({
         message:
-          'Demo mode: please use one of the configured test mobile numbers shown on the registration page.',
+          'Demo mobile verification is enabled for this build. Use one of the configured test mobile numbers.',
       });
   }
 
-
-  /*
-  =========================================
-  AADHAAR REQUIRED
-  =========================================
-  */
-
   if (!req.file) {
-
     return res
       .status(400)
       .json({
@@ -1219,18 +1256,10 @@ export async function registerOwner(
       });
   }
 
-
-  /*
-  =========================================
-  PASSWORD VALIDATION
-  =========================================
-  */
-
   if (
     password !==
     confirmPassword
   ) {
-
     return res
       .status(400)
       .json({
@@ -1239,12 +1268,10 @@ export async function registerOwner(
       });
   }
 
-
   if (
     password.length <
     8
   ) {
-
     return res
       .status(400)
       .json({
@@ -1253,30 +1280,20 @@ export async function registerOwner(
       });
   }
 
-
-  /*
-  =========================================
-  VERIFY MOBILE PROOF
-  =========================================
-  */
-
   const phoneProof =
     await RegistrationPhoneVerification
       .findOne({
         phone,
-
         tokenHash:
           hashToken(
             String(
               phoneVerificationToken
             )
           ),
-
         verifiedAt: {
           $ne:
             null,
         },
-
         expiresAt: {
           $gt:
             new Date(),
@@ -1286,9 +1303,7 @@ export async function registerOwner(
         '+tokenHash'
       );
 
-
   if (!phoneProof) {
-
     return res
       .status(403)
       .json({
@@ -1297,90 +1312,21 @@ export async function registerOwner(
       });
   }
 
-
-  /*
-  =========================================
-  VERIFY EMAIL PROOF
-  =========================================
-  */
-
-  const emailProof =
-    await RegistrationEmailVerification
-      .findOne({
-        email,
-
-        tokenHash:
-          hashToken(
-            String(
-              emailVerificationToken
-            )
-          ),
-
-        verifiedAt: {
-          $ne:
-            null,
-        },
-
-        expiresAt: {
-          $gt:
-            new Date(),
-        },
-      })
-      .select(
-        '+tokenHash'
-      );
-
-
-  if (!emailProof) {
-
-    return res
-      .status(403)
-      .json({
-        message:
-          'Email verification is missing or expired. Verify your email address again.',
-      });
-  }
-
-
-  /*
-  =========================================
-  NORMALIZE USERNAME
-  =========================================
-  */
-
   const normalizedUsername =
     username
       .trim()
       .toLowerCase();
 
-
-  /*
-  =========================================
-  CHECK DUPLICATES
-  =========================================
-  */
-
   const existing =
     await User.findOne({
       $or: [
-        {
-          username:
-            normalizedUsername,
-        },
-
-        {
-          email,
-        },
-
-        {
-          phone,
-        },
+        { username: normalizedUsername },
+        { email },
+        { phone },
       ],
     }).lean();
 
-
   if (existing) {
-
     return res
       .status(409)
       .json({
@@ -1389,25 +1335,10 @@ export async function registerOwner(
       });
   }
 
-
-  /*
-  =========================================
-  ENCRYPTED AADHAAR UPLOAD
-  =========================================
-  */
-
   let uploadResult =
     null;
 
-
   try {
-
-    /*
-    -----------------------------------------
-    AES-256-GCM ENCRYPT ORIGINAL FILE
-    -----------------------------------------
-    */
-
     const {
       encrypted,
       encryption,
@@ -1416,49 +1347,11 @@ export async function registerOwner(
         req.file.buffer
       );
 
-
-    /*
-    -----------------------------------------
-    UPLOAD ENCRYPTED BYTES ONLY
-    -----------------------------------------
-    */
-
     uploadResult =
       await uploadEncryptedAadhaar(
         encrypted,
-
-        'digital-legacy/encrypted-aadhaar/owners'
+        'digital-legacy/encrypted-aadhaar/users'
       );
-
-
-    /*
-    Optional development logs.
-    These contain NO Aadhaar data.
-    */
-
-    console.log(
-      'Encrypted User Aadhaar uploaded:',
-      {
-        publicId:
-          uploadResult.public_id,
-
-        resourceType:
-          uploadResult.resource_type,
-
-        originalSize:
-          req.file.size,
-
-        encryptedSize:
-          encrypted.length,
-      }
-    );
-
-
-    /*
-    -----------------------------------------
-    HASH PASSWORD
-    -----------------------------------------
-    */
 
     const passwordHash =
       await bcrypt.hash(
@@ -1466,172 +1359,359 @@ export async function registerOwner(
         SALT_ROUNDS
       );
 
-
-    /*
-    -----------------------------------------
-    CREATE PENDING USER
-    -----------------------------------------
-    */
-
     const user =
       await User.create({
-
         name:
           name.trim(),
-
         username:
           normalizedUsername,
-
         email,
-
         emailVerified:
-          true,
-
+          false,
         phone,
-
         phoneVerified:
           true,
-
         passwordHash,
-
         role:
           'USER',
-
         status:
           'PENDING',
-
         createdBy:
           null,
-
         mustChangePassword:
           false,
-
-
-        /*
-        =====================================
-        ENCRYPTED AADHAAR METADATA
-        =====================================
-        */
-
         aadhaarDocument: {
-
           publicId:
             uploadResult.public_id,
-
           resourceType:
             'raw',
-
           deliveryType:
             'authenticated',
-
           originalName:
             req.file.originalname,
-
           mimeType:
             req.file.mimetype,
-
           fileSize:
             req.file.size,
-
           encryptedSize:
             encrypted.length,
-
           encryption,
         },
-
-
         verification: {
-
           reviewedBy:
             null,
-
           reviewedAt:
             null,
-
           rejectionReason:
             null,
         },
       });
 
+    await RegistrationPhoneVerification.deleteOne({
+      _id:
+        phoneProof._id,
+    });
 
-    /*
-    -----------------------------------------
-    REMOVE USED OTP VERIFICATION PROOFS
-    -----------------------------------------
-    */
+    await RegistrationEmailVerification.deleteOne({
+      email:
+        user.email,
+    });
 
-    await Promise.all([
+    let verificationEmailSent =
+      false;
 
-      RegistrationPhoneVerification.deleteOne({
-        _id:
-          phoneProof._id,
-      }),
+    try {
+      await createEmailVerificationSession(
+        user
+      );
 
-      RegistrationEmailVerification.deleteOne({
-        _id:
-          emailProof._id,
-      }),
-    ]);
+      verificationEmailSent =
+        true;
+    } catch (mailError) {
+      console.error(
+        'Registration verification email failed:',
+        mailError.message
+      );
+    }
 
+    await writeAudit(req, {
+      action:
+        'USER_REGISTERED',
+      entityType:
+        'User',
+      entityId:
+        user._id,
+      description:
+        'New user registration created and queued for email/admin verification.',
+      metadata: {
+        verificationEmailSent,
+      },
+    });
 
     return res
       .status(201)
       .json({
-
         message:
-          'Registration received. Your email and mobile number are verified. Your Aadhaar has been encrypted securely. An administrator must review it and approve your account before you can log in.',
+          verificationEmailSent
+            ? 'Registration received. A verification link was sent to your email. Your Aadhaar is also awaiting administrator approval.'
+            : 'Registration received, but the verification email could not be sent. Use Resend Verification Email before signing in.',
+
+        verificationEmailSent,
+
+        email:
+          user.email,
 
         user:
           publicUser(
             user
           ),
       });
-
-
   } catch (error) {
-
-    /*
-    =========================================
-    CLOUDINARY CLEANUP
-    =========================================
-    */
-
     if (
       uploadResult
         ?.public_id
     ) {
-
       try {
-
         await deleteEncryptedAadhaar({
           publicId:
             uploadResult.public_id,
         });
-
       } catch (
         cleanupError
       ) {
-
         console.error(
           'Encrypted Aadhaar cleanup failed:',
           cleanupError
         );
-
       }
     }
-
 
     console.error(
       'user registration error:',
       error
     );
 
-
     return res
       .status(500)
       .json({
         message:
           'Registration failed. Please try again.',
+      });
+  }
+}
+
+export async function verifyRegistrationEmailLink(
+  req,
+  res
+) {
+  try {
+    const token =
+      String(
+        req.body?.token ||
+        req.query?.token ||
+        ''
+      ).trim();
+
+    if (!token) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'Verification token is required.',
+        });
+    }
+
+    const tokenHash =
+      hashToken(
+        token
+      );
+
+    const session =
+      await RegistrationEmailVerification
+        .findOne({
+          tokenHash,
+          expiresAt: {
+            $gt:
+              new Date(),
+          },
+        })
+        .select(
+          '+tokenHash'
+        );
+
+    if (!session) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'This email verification link is invalid or has expired.',
+        });
+    }
+
+    const user =
+      await User.findOne({
+        email:
+          session.email,
+      });
+
+    if (!user) {
+      await RegistrationEmailVerification.deleteOne({
+        _id:
+          session._id,
+      });
+
+      return res
+        .status(404)
+        .json({
+          message:
+            'Registration account not found.',
+        });
+    }
+
+    user.emailVerified =
+      true;
+
+    await user.save();
+
+    await RegistrationEmailVerification.deleteOne({
+      _id:
+        session._id,
+    });
+
+    await writeAudit(req, {
+      action:
+        'EMAIL_VERIFIED',
+      entityType:
+        'User',
+      entityId:
+        user._id,
+      description:
+        'User verified registration email using a single-use link.',
+    });
+
+    return res
+      .status(200)
+      .json({
+        message:
+          'Email verified successfully. Administrator approval may still be required before login.',
+        verified:
+          true,
+      });
+  } catch (error) {
+    console.error(
+      'Registration email link verification error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        message:
+          'Unable to verify this email link.',
+      });
+  }
+}
+
+export async function resendRegistrationVerification(
+  req,
+  res
+) {
+  try {
+    const email =
+      normalizeEmail(
+        req.body?.email
+      );
+
+    if (
+      !email ||
+      !isValidEmail(
+        email
+      )
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'Enter a valid email address.',
+        });
+    }
+
+    const user =
+      await User.findOne({
+        email,
+        role:
+          'USER',
+      }).select(
+        'name username email emailVerified'
+      );
+
+    if (!user) {
+      return res
+        .status(200)
+        .json({
+          message:
+            'If a matching unverified account exists, a new verification email will be sent.',
+        });
+    }
+
+    if (
+      user.emailVerified
+    ) {
+      return res
+        .status(200)
+        .json({
+          message:
+            'This email address is already verified.',
+          verified:
+            true,
+        });
+    }
+
+    const existing =
+      await RegistrationEmailVerification
+        .findOne({
+          email,
+        });
+
+    const retryAfterSeconds =
+      getRetryAfterSeconds(
+        existing?.lastSentAt
+      );
+
+    if (
+      retryAfterSeconds >
+      0
+    ) {
+      return res
+        .status(429)
+        .json({
+          message:
+            `Please wait ${retryAfterSeconds} seconds before requesting another verification email.`,
+          retryAfterSeconds,
+        });
+    }
+
+    await createEmailVerificationSession(
+      user
+    );
+
+    return res
+      .status(200)
+      .json({
+        message:
+          'A new verification link was sent to your registered email address.',
+      });
+  } catch (error) {
+    console.error(
+      'Resend registration verification error:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        message:
+          'Unable to send a new verification email. Please check the SMTP configuration and try again.',
       });
   }
 }
