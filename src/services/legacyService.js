@@ -192,6 +192,12 @@ export async function downloadDocument(documentId) {
   return requestBlob('/documents/' + documentId + '/download');
 }
 
+export async function deleteDocument(documentId) {
+  return request('/documents/' + documentId, {
+    method: 'DELETE',
+  });
+}
+
 export async function getIncomingAllocations() {
   const data = await request('/legacy-allocations/incoming');
   return data.allocations || [];
