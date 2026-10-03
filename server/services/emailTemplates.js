@@ -70,6 +70,38 @@ NextGen Vault`,
   };
 }
 
+export function securityOtpTemplate({
+  recipientName = 'there',
+  purpose = 'account verification',
+  otp,
+}) {
+  const purposeTitle =
+    String(purpose || 'account verification')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  return {
+    subject: purposeTitle + ' – NextGen Vault',
+    text: `Hello ${recipientName},
+
+Your NextGen Vault ${purpose} code is ${otp}.
+
+This code expires in 5 minutes.
+
+If you did not request this action, ignore this email.
+
+Regards,
+NextGen Vault`,
+    html: brandedLayout({
+      title: purposeTitle,
+      intro: `Hello ${recipientName}, use the code below to continue ${purpose}.`,
+      body:
+        '<div style="margin:22px 0;padding:18px;border-radius:12px;background:#f1f5f9;text-align:center;font-size:30px;letter-spacing:8px;font-weight:700;color:#0f172a">' +
+        escapeHtml(otp) +
+        '</div><p>This code expires in <strong>5 minutes</strong>.</p>',
+    }),
+  };
+}
+
 export function legacyAllocationTemplate({ recipientName, allocatorName, assetName, allocationDate, status, appUrl }) {
   return {
     subject: 'You’ve Been Assigned a New Legacy Document – NextGen Vault',
