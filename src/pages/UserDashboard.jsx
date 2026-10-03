@@ -16,6 +16,7 @@ import {
 import Navbar from '../components/Navbar';
 import {
   createLegacyAllocation,
+  deleteDocument,
   downloadDocument,
   getOutgoingAllocations,
   openDocument,
@@ -173,6 +174,24 @@ export default function UserDashboard() {
       URL.revokeObjectURL(url);
     } catch (error) {
       setMessage(error.message || 'Unable to download document.');
+    }
+  };
+
+  const deleteOwnedDocument = async (document) => {
+    const confirmed = window.confirm(
+      'Delete "' + document.title + '"? This permanently removes the encrypted file and its vault metadata.'
+    );
+
+    if (!confirmed) return;
+
+    setMessage('');
+
+    try {
+      await deleteDocument(document.id);
+      setMessage('Document deleted securely.');
+      await refresh();
+    } catch (error) {
+      setMessage(error.message || 'Unable to delete document.');
     }
   };
 
@@ -412,6 +431,14 @@ export default function UserDashboard() {
                     >
                       <Download size={15} />
                       Download
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteOwnedDocument(doc)}
+                      className="btn-secondary"
+                    >
+                      <Trash2 size={15} />
+                      Delete
                     </button>
                   </div>
                 </article>
