@@ -1127,8 +1127,30 @@ export async function rejectUser(
               .replace(/\/$/, '') + '/register',
         }),
       });
+
+      await writeAudit(req, {
+        action: 'EMAIL_SENT',
+        entityType: 'User',
+        entityId: user._id,
+        description: 'Registration rejection email sent.',
+        metadata: {
+          emailType: 'REGISTRATION_REJECTION',
+        },
+      });
     } catch (mailError) {
       console.error('Registration rejection email failed:', mailError.message);
+
+      await writeAudit(req, {
+        action: 'EMAIL_FAILED',
+        entityType: 'User',
+        entityId: user._id,
+        description: 'Registration rejection email failed.',
+        metadata: {
+          emailType: 'REGISTRATION_REJECTION',
+          reason: mailError.message,
+        },
+        status: 'FAILED',
+      });
     }
 
     await writeAudit(req, {
