@@ -2,18 +2,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Archive,
+  Download,
+  Eye,
   FilePlus2,
   Loader2,
   Search,
   Send,
   ShieldCheck,
+  Trash2,
   Users,
 } from 'lucide-react';
 
 import Navbar from '../components/Navbar';
 import {
   createLegacyAllocation,
+  downloadDocument,
   getOutgoingAllocations,
+  openDocument,
+  revokeLegacyAllocation,
   searchAllocationUsers,
 } from '../services/legacyService';
 
@@ -137,6 +143,50 @@ export default function UserDashboard() {
     }
   };
 
+  const openOwnedDocument = async (document) => {
+    setMessage('');
+    try {
+      const blob = await openDocument(document.id);
+      const url = URL.createObjectURL(blob);
+      const popup = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!popup) {
+        URL.revokeObjectURL(url);
+        throw new Error('The browser blocked the document preview window.');
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      setMessage(error.message || 'Unable to preview document.');
+    }
+  };
+
+  const downloadOwnedDocument = async (document) => {
+    setMessage('');
+    try {
+      const blob = await downloadDocument(document.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = document.originalName || document.title || 'document';
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(error.message || 'Unable to download document.');
+    }
+  };
+
+  const revokeOutgoingAllocation = async (allocationId) => {
+    setMessage('');
+    try {
+      await revokeLegacyAllocation(allocationId);
+      setMessage('Legacy allocation revoked.');
+      await refresh();
+    } catch (error) {
+      setMessage(error.message || 'Unable to revoke allocation.');
+    }
+  };
+
   const handleAllocate = async (event) => {
     event.preventDefault();
     if (!allocationAssetId || !recipient) {
@@ -150,7 +200,7 @@ export default function UserDashboard() {
       await createLegacyAllocation({
         assetId: allocationAssetId,
         allocatedTo: recipient.id,
-        permissions: { view: true, download: false },
+        permissions: { view: true, download: true },
         releaseCondition: 'LEGACY_CLAIM',
       });
       setRecipient(null);
@@ -345,6 +395,25 @@ export default function UserDashboard() {
                 <article key={doc.id} className="rounded-2xl border border-slate-200 p-4">
                   <p className="font-semibold text-slate-900">{doc.title}</p>
                   <p className="mt-1 text-xs text-slate-500">{doc.category} · {doc.recordType}</p>
+                  <p className="mt-1 truncate text-xs text-slate-400">{doc.originalName}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openOwnedDocument(doc)}
+                      className="btn-secondary"
+                    >
+                      <Eye size={15} />
+                      View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadOwnedDocument(doc)}
+                      className="btn-secondary"
+                    >
+                      <Download size={15} />
+                      Download
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -366,6 +435,16 @@ export default function UserDashboard() {
                     To {allocation.allocatedTo?.name} (@{allocation.allocatedTo?.username}) · {allocation.status}
                   </p>
                 </div>
+                {allocation.status !== 'REVOKED' && (
+                  <button
+                    type="button"
+                    onClick={() => revokeOutgoingAllocation(allocation.id)}
+                    className="btn-secondary"
+                  >
+                    <Trash2 size={15} />
+                    Revoke
+                  </button>
+                )}
               </article>
             ))}
           </div>
