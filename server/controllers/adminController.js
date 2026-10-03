@@ -1,5 +1,7 @@
 import cloudinary from '../config/cloudinary.js';
 import User from '../models/User.js';
+import Document from '../models/Document.js';
+import LegacyAllocation from '../models/LegacyAllocation.js';
 import { sendTransactionalEmail } from '../services/mailService.js';
 import { claimStageTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
@@ -1080,5 +1082,154 @@ export async function rejectUser(
         message:
           'Unable to reject registration.',
       });
+  }
+}
+
+export async function listAdminDocuments(req, res) {
+  try {
+    const { verificationStatus, ownerId, q, page = '1', limit = '50' } = req.query;
+    const filter = {};
+    if (verificationStatus) filter.verificationStatus = verificationStatus;
+    if (ownerId) filter.ownerId = ownerId;
+    if (q) {
+      const escaped = String(q).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      filter.$or = [
+        { title: new RegExp(escaped, 'i') },
+        { originalName: new RegExp(escaped, 'i') },
+      ];
+    }
+
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = (safePage - 1) * safeLimit;
+
+    const [documents, total] = await Promise.all([
+      Document.find(filter)
+        .populate('ownerId', 'name username email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .lean(),
+      Document.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      page: safePage,
+      limit: safeLimit,
+      total,
+      documents: documents.map((document) => ({
+        id: document._id.toString(),
+        owner: document.ownerId ? {
+          id: document.ownerId._id.toString(),
+          name: document.ownerId.name,
+          username: document.ownerId.username,
+          email: document.ownerId.email,
+        } : null,
+        title: document.title,
+        category: document.category,
+        recordType: document.recordType,
+        originalName: document.originalName,
+        fileType: document.fileType,
+        fileSize: document.fileSize,
+        sha256: document.sha256 || null,
+        verificationStatus: document.verificationStatus || 'PENDING',
+        verificationRemarks: document.verificationRemarks || '',
+        createdAt: document.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Admin list documents error:', error);
+    return res.status(500).json({ message: 'Unable to load document records.' });
+  }
+}
+
+export async function reviewDocumentVerification(req, res) {
+  try {
+    const status = String(req.body?.status || '').toUpperCase();
+    const remarks = String(req.body?.remarks || '').trim();
+    if (!['VERIFIED', 'FLAGGED', 'FAILED', 'PENDING'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid document verification status.' });
+    }
+
+    const document = await Document.findById(req.params.id);
+    if (!document) return res.status(404).json({ message: 'Document not found.' });
+
+    document.verificationStatus = status;
+    document.verificationRemarks = remarks;
+    document.verificationReviewedBy = req.user.id;
+    document.verificationReviewedAt = new Date();
+    await document.save();
+
+    await writeAudit(req, {
+      action: 'DOCUMENT_VERIFICATION_REVIEWED',
+      entityType: 'Document',
+      entityId: document._id,
+      description: 'Administrator updated the technical document verification status.',
+      metadata: {
+        status,
+        remarks,
+        sha256: document.sha256 || null,
+        authenticityDisclaimer: 'This is a technical review status and is not proof of legal authenticity.',
+      },
+    });
+
+    return res.status(200).json({
+      message: 'Document technical verification status updated. This status does not establish legal authenticity.',
+      document: {
+        id: document._id.toString(),
+        verificationStatus: document.verificationStatus,
+        verificationRemarks: document.verificationRemarks,
+      },
+    });
+  } catch (error) {
+    console.error('Document verification review error:', error);
+    return res.status(500).json({ message: 'Unable to update document verification status.' });
+  }
+}
+
+export async function listAdminLegacyAllocations(req, res) {
+  try {
+    const { status, allocatedBy, allocatedTo, page = '1', limit = '50' } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+    if (allocatedBy) filter.allocatedBy = allocatedBy;
+    if (allocatedTo) filter.allocatedTo = allocatedTo;
+
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = (safePage - 1) * safeLimit;
+
+    const [allocations, total] = await Promise.all([
+      LegacyAllocation.find(filter)
+        .populate('assetId', 'title category recordType verificationStatus')
+        .populate('allocatedBy', 'name username email')
+        .populate('allocatedTo', 'name username email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(safeLimit)
+        .lean(),
+      LegacyAllocation.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      page: safePage,
+      limit: safeLimit,
+      total,
+      allocations: allocations.map((allocation) => ({
+        id: allocation._id.toString(),
+        asset: allocation.assetId,
+        allocatedBy: allocation.allocatedBy,
+        allocatedTo: allocation.allocatedTo,
+        permissions: allocation.permissions,
+        status: allocation.status,
+        releaseCondition: allocation.releaseCondition,
+        releaseDate: allocation.releaseDate,
+        createdAt: allocation.createdAt,
+        updatedAt: allocation.updatedAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Admin list legacy allocations error:', error);
+    return res.status(500).json({ message: 'Unable to load legacy allocations.' });
   }
 }
