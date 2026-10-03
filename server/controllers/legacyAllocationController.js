@@ -1,10 +1,9 @@
 import LegacyAllocation from '../models/LegacyAllocation.js';
 import Document from '../models/Document.js';
 import User from '../models/User.js';
-import { legacyAllocationTemplate } from '../services/emailTemplates.js';
+import { legacyAllocationTemplate, claimStageTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
 import { createNotification } from '../services/notificationService.js';
-import { claimStageTemplate } from '../services/emailTemplates.js';
 
 function allocationPayload(allocation) {
   return {
@@ -15,6 +14,8 @@ function allocationPayload(allocation) {
           title: allocation.assetId.title,
           category: allocation.assetId.category,
           recordType: allocation.assetId.recordType || 'GENERAL',
+          originalName: allocation.assetId.originalName || null,
+          fileType: allocation.assetId.fileType || null,
         }
       : allocation.assetId,
     allocatedBy: allocation.allocatedBy && typeof allocation.allocatedBy === 'object'
@@ -45,7 +46,7 @@ function allocationPayload(allocation) {
 
 function populate(query) {
   return query
-    .populate('assetId', 'title category recordType')
+    .populate('assetId', 'title category recordType originalName fileType')
     .populate('allocatedBy', 'name username email')
     .populate('allocatedTo', 'name username email');
 }
@@ -80,7 +81,6 @@ export async function createLegacyAllocation(req, res) {
       allocatedTo,
       permissions = {},
       releaseCondition = 'LEGACY_CLAIM',
-      releaseDate = null,
     } = req.body;
 
     if (!assetId || !allocatedTo) {
@@ -111,12 +111,11 @@ export async function createLegacyAllocation(req, res) {
       return res.status(404).json({ message: 'Recipient user not found or is not active.' });
     }
 
-    const validConditions = ['LEGACY_CLAIM', 'DATE', 'IMMEDIATE'];
-    if (!validConditions.includes(releaseCondition)) {
-      return res.status(400).json({ message: 'Invalid release condition.' });
-    }
-    if (releaseCondition === 'DATE' && !releaseDate) {
-      return res.status(400).json({ message: 'releaseDate is required for DATE-based release.' });
+    if (releaseCondition !== 'LEGACY_CLAIM') {
+      return res.status(400).json({
+        message:
+          'Legacy allocations must use the claim workflow. Immediate or date-only document release is not permitted.',
+      });
     }
 
     const normalizedPermissions = {
@@ -128,11 +127,8 @@ export async function createLegacyAllocation(req, res) {
       assetId: asset._id,
       allocatedTo: recipient._id,
       status: { $nin: ['REVOKED', 'EXPIRED'] },
-      releaseCondition,
-      releaseDate:
-        releaseCondition === 'DATE'
-          ? new Date(releaseDate)
-          : null,
+      releaseCondition: 'LEGACY_CLAIM',
+      releaseDate: null,
       'permissions.view': normalizedPermissions.view,
       'permissions.download': normalizedPermissions.download,
     });
@@ -149,9 +145,9 @@ export async function createLegacyAllocation(req, res) {
       allocatedBy: req.user.id,
       allocatedTo: recipient._id,
       permissions: normalizedPermissions,
-      releaseCondition,
-      releaseDate: releaseCondition === 'DATE' ? new Date(releaseDate) : null,
-      status: releaseCondition === 'IMMEDIATE' ? 'RELEASED' : 'ACTIVE',
+      releaseCondition: 'LEGACY_CLAIM',
+      releaseDate: null,
+      status: 'ACTIVE',
     });
 
     const appUrl =
@@ -176,10 +172,7 @@ export async function createLegacyAllocation(req, res) {
         allocatorName: sender?.name || 'A user',
         assetName: asset.title,
         allocationDate: new Date(allocation.createdAt).toLocaleString('en-IN'),
-        status:
-          allocation.releaseCondition === 'LEGACY_CLAIM'
-            ? 'Locked / Awaiting Claim'
-            : allocation.status,
+        status: 'Locked / Awaiting Claim',
         appUrl,
       }),
     });
