@@ -1,5 +1,8 @@
 import cloudinary from '../config/cloudinary.js';
 import User from '../models/User.js';
+import { sendTransactionalEmail } from '../services/mailService.js';
+import { claimStageTemplate } from '../services/emailTemplates.js';
+import { writeAudit } from '../services/auditService.js';
 
 import {
   decryptAadhaarBuffer,
@@ -300,6 +303,35 @@ export async function updateUserStatus(
       status;
 
     await user.save();
+
+    const appUrl =
+      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+        .replace(/\/$/, '') + '/login';
+
+    try {
+      await sendTransactionalEmail({
+        to: user.email,
+        ...claimStageTemplate({
+          recipientName: user.name || user.username,
+          subject: 'Your NextGen Vault Account Has Been Approved',
+          message:
+            user.role === 'LAWYER'
+              ? 'Your lawyer account has been approved and is now active.'
+              : 'Your account has been approved. You can sign in after your email address is verified.',
+          appUrl,
+        }),
+      });
+    } catch (mailError) {
+      console.error('Account approval email failed:', mailError.message);
+    }
+
+    await writeAudit(req, {
+      action: 'ACCOUNT_APPROVED',
+      entityType: 'User',
+      entityId: user._id,
+      description: 'Administrator approved a pending account.',
+      metadata: { role: user.role },
+    });
 
     return res
       .status(200)
@@ -974,6 +1006,35 @@ export async function rejectUser(
           });
       }
     }
+
+    try {
+      await sendTransactionalEmail({
+        to: user.email,
+        ...claimStageTemplate({
+          recipientName: user.name || user.username,
+          subject: 'NextGen Vault Registration Review',
+          message:
+            'Your registration was not approved.' +
+            (reason ? ' Reason: ' + reason : ''),
+          appUrl:
+            (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+              .replace(/\/$/, '') + '/register',
+        }),
+      });
+    } catch (mailError) {
+      console.error('Registration rejection email failed:', mailError.message);
+    }
+
+    await writeAudit(req, {
+      action: 'ACCOUNT_REGISTRATION_REJECTED',
+      entityType: 'User',
+      entityId: user._id,
+      description: 'Administrator rejected a pending registration.',
+      metadata: {
+        role: user.role,
+        reason: reason || null,
+      },
+    });
 
     /*
     =========================================
