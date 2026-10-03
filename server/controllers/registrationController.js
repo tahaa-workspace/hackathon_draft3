@@ -6,7 +6,8 @@ import User from '../models/User.js';
 import RegistrationPhoneVerification from '../models/RegistrationPhoneVerification.js';
 import RegistrationEmailVerification from '../models/RegistrationEmailVerification.js';
 
-import transporter from '../config/mailer.js';
+import { sendTransactionalEmail } from '../services/mailService.js';
+import { registrationOtpTemplate } from '../services/emailTemplates.js';
 
 import {
   encryptAadhaarBuffer,
@@ -796,7 +797,7 @@ export async function requestRegistrationEmailOTP(
 
 
     const demoEmailOtpEnabled =
-      process.env.DEMO_EMAIL_OTP !== 'false';
+      process.env.DEMO_EMAIL_OTP === 'true';
 
 
     if (demoEmailOtpEnabled) {
@@ -829,59 +830,14 @@ export async function requestRegistrationEmailOTP(
 
       try {
 
-        await transporter.sendMail({
-          from: {
-            name:
-              'NextGen Vault',
+        const emailContent = registrationOtpTemplate({
+          name: email,
+          otp,
+        });
 
-            address:
-              process.env.EMAIL_USER,
-          },
-
-          to:
-            email,
-
-          subject:
-            'NextGen Vault - Verify Your Email',
-
-          text:
-            `Your NextGen Vault email verification OTP is ${otp}. It expires in 5 minutes.`,
-
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px">
-              <div style="border:1px solid #e2e8f0;border-radius:14px;padding:28px">
-                <h2 style="margin-top:0;color:#0f172a">NextGen Vault</h2>
-
-                <p style="color:#475569">
-                  Use this OTP to verify your email address for user registration.
-                </p>
-
-                <div style="
-                  margin:24px 0;
-                  padding:18px;
-                  background:#f1f5f9;
-                  border-radius:10px;
-                  text-align:center;
-                  font-size:32px;
-                  letter-spacing:10px;
-                  font-weight:bold;
-                  color:#0f172a;
-                ">
-                  ${otp}
-                </div>
-
-                <p style="color:#64748b">
-                  This OTP expires in <strong>5 minutes</strong>.
-                </p>
-
-                <p style="color:#64748b;font-size:13px">
-                  If you did not request this registration,
-                  you can ignore this email.
-                </p>
-
-              </div>
-            </div>
-          `,
+        await sendTransactionalEmail({
+          to: email,
+          ...emailContent,
         });
 
       } catch (mailError) {
