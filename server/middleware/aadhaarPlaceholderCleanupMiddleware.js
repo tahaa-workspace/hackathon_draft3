@@ -4,7 +4,7 @@ import {
   getAadhaarPlaceholderPublicId,
 } from '../services/aadhaarEncryptionService.js';
 
-export default async function cleanupOwnerAadhaarPlaceholderOnReject(
+export default async function cleanupUserAadhaarPlaceholderOnReject(
   req,
   res,
   next
@@ -14,7 +14,7 @@ export default async function cleanupOwnerAadhaarPlaceholderOnReject(
       .select('role aadhaarDocument')
       .lean();
 
-    if (user?.role === 'OWNER' && user.aadhaarDocument?.publicId) {
+    if (user?.role === 'USER' && user.aadhaarDocument?.publicId) {
       const placeholderPublicId =
         user.aadhaarDocument.placeholderPublicId ||
         getAadhaarPlaceholderPublicId(user.aadhaarDocument.publicId);
