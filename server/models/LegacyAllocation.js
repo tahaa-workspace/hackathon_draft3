@@ -53,5 +53,7 @@ const legacyAllocationSchema = new Schema(
 );
 
 legacyAllocationSchema.index({ assetId: 1, allocatedTo: 1, status: 1 });
+legacyAllocationSchema.index({ allocatedTo: 1, status: 1, createdAt: -1 });
+legacyAllocationSchema.index({ allocatedBy: 1, createdAt: -1 });
 
 export default mongoose.model('LegacyAllocation', legacyAllocationSchema);
