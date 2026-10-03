@@ -24,6 +24,8 @@ function documentPayload(document) {
         originalName: document.originalName,
         fileType: document.fileType,
         fileSize: document.fileSize,
+        sha256: document.sha256 || null,
+        verificationStatus: document.verificationStatus || "PENDING",
         assignedBeneficiaryIds: (document.assignedBeneficiaries || []).map((id) =>
             id.toString()
         ),
