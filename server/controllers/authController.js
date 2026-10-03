@@ -6,7 +6,8 @@ import cloudinary from '../config/cloudinary.js';
 import crypto from "crypto";
 import PasswordChangeOTP from "../models/PasswordChangeOTP.js";
 import { writeAudit } from '../services/auditService.js';
-import transporter from "../config/mailer.js";
+import { sendTransactionalEmail } from "../services/mailService.js";
+import { securityOtpTemplate } from "../services/emailTemplates.js";
 import {
   encryptAadhaarBuffer,
   uploadEncryptedAadhaar,
@@ -712,114 +713,15 @@ export const requestPasswordChangeOTP =
         */
 
         try {
+            const emailContent = securityOtpTemplate({
+                recipientName: user.name || user.username,
+                purpose: 'password change verification',
+                otp,
+            });
 
-            await transporter.sendMail({
-
-                from: {
-                    name:
-                        "NextGen Vault",
-
-                    address:
-                        process.env.EMAIL_USER,
-                },
-
-                to:
-                    user.email,
-
-                subject:
-                    "NextGen Vault - Password Change Verification",
-
-                text: `
-Hello ${user.name || user.username},
-
-Your password change verification code is:
-
-${otp}
-
-This OTP will expire in 5 minutes.
-
-If you did not request this password change, please ignore this email.
-
-NextGen Vault
-                `.trim(),
-
-                html: `
-                    <div style="
-                        font-family: Arial, sans-serif;
-                        max-width: 600px;
-                        margin: auto;
-                        padding: 24px;
-                    ">
-
-                        <div style="
-                            background: #ffffff;
-                            border: 1px solid #e2e8f0;
-                            border-radius: 14px;
-                            padding: 28px;
-                        ">
-
-                            <h2 style="
-                                color: #0f172a;
-                                margin-top: 0;
-                            ">
-                                NextGen Vault
-                            </h2>
-
-                            <p style="
-                                color: #475569;
-                            ">
-                                Hello
-                                <strong>
-                                    ${user.name || user.username}
-                                </strong>,
-                            </p>
-
-                            <p style="
-                                color: #475569;
-                            ">
-                                Use this verification code to
-                                continue changing your password.
-                            </p>
-
-                            <div style="
-                                margin: 24px 0;
-                                padding: 18px;
-                                background: #f1f5f9;
-                                border-radius: 10px;
-                                text-align: center;
-                            ">
-
-                                <div style="
-                                    font-size: 32px;
-                                    letter-spacing: 10px;
-                                    font-weight: bold;
-                                    color: #0f172a;
-                                ">
-                                    ${otp}
-                                </div>
-
-                            </div>
-
-                            <p style="
-                                color: #64748b;
-                            ">
-                                This OTP expires in
-                                <strong>5 minutes</strong>.
-                            </p>
-
-                            <p style="
-                                color: #64748b;
-                                font-size: 13px;
-                            ">
-                                If you did not request a password
-                                change, you can safely ignore this
-                                message.
-                            </p>
-
-                        </div>
-
-                    </div>
-                `,
+            await sendTransactionalEmail({
+                to: user.email,
+                ...emailContent,
             });
 
         } catch (mailError) {
