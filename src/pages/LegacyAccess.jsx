@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  Download,
   Eye,
   FileLock2,
   Loader2,
@@ -11,6 +12,7 @@ import {
 
 import Navbar from '../components/Navbar';
 import {
+  downloadDocument,
   getIncomingAllocations,
   getMyLegacyClaims,
   openDocument,
@@ -19,6 +21,30 @@ import {
 
 function claimForAllocation(claims, allocationId) {
   return claims.find((claim) => claim.allocationId === allocationId) || null;
+}
+
+function claimProgress(status) {
+  const steps = [
+    { key: 'submitted', label: 'Claim submitted' },
+    { key: 'admin', label: 'Admin verification' },
+    { key: 'lawyer', label: 'Lawyer verification' },
+    { key: 'access', label: 'Legacy access' },
+  ];
+
+  const completedByStatus = {
+    UNDER_ADMIN_REVIEW: 1,
+    MORE_INFORMATION_REQUIRED: 1,
+    LEGACY_ACCESS_REQUESTED: 2,
+    UNDER_LAWYER_REVIEW: 2,
+    APPROVED_INFORMATION_RELEASED: 4,
+    REJECTED_PLATFORM_CLAIM: 1,
+  };
+
+  return {
+    steps,
+    completed: completedByStatus[status] || 0,
+    rejected: status === 'REJECTED_PLATFORM_CLAIM',
+  };
 }
 
 function canAccessWithoutClaim(allocation) {
@@ -75,6 +101,23 @@ export default function LegacyAccess() {
 
   const visibleCount = useMemo(() => allocations.length, [allocations]);
 
+  const handleDownload = async (allocation) => {
+    try {
+      setMessage('');
+      const blob = await downloadDocument(allocation.asset?.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = allocation.asset?.title || 'legacy-document';
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(error.message || 'Unable to download legacy document.');
+    }
+  };
+
   const handleOpen = async (assetId) => {
     try {
       const blob = await openDocument(assetId);
@@ -121,6 +164,7 @@ export default function LegacyAccess() {
         supportingDocument: null,
       });
       await refresh();
+      window.dispatchEvent(new Event('nextgen:notifications-changed'));
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -212,23 +256,60 @@ export default function LegacyAccess() {
                         )}
                       </div>
 
-                      {claim && (
-                        <p className="mt-2 text-xs text-slate-500">
-                          Claim status: <strong>{claim.status}</strong>
-                        </p>
-                      )}
+                      {claim && (() => {
+                        const progress = claimProgress(claim.status);
+                        return (
+                          <div className="mt-4">
+                            <p className="text-xs text-slate-500">
+                              Claim status: <strong>{claim.status}</strong>
+                            </p>
+                            <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                              {progress.steps.map((step, index) => {
+                                const done = index < progress.completed;
+                                return (
+                                  <div
+                                    key={step.key}
+                                    className={
+                                      'rounded-xl border px-3 py-2 text-xs ' +
+                                      (done
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                        : progress.rejected
+                                          ? 'border-red-100 bg-red-50 text-red-600'
+                                          : 'border-slate-200 bg-slate-50 text-slate-500')
+                                    }
+                                  >
+                                    {done ? '✓ ' : '○ '}{step.label}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       {canOpen && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpen(allocation.asset?.id)}
-                          className="btn-primary"
-                        >
-                          <Eye size={16} />
-                          View document
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleOpen(allocation.asset?.id)}
+                            className="btn-primary"
+                          >
+                            <Eye size={16} />
+                            View document
+                          </button>
+                          {allocation.permissions?.download && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownload(allocation)}
+                              className="btn-secondary"
+                            >
+                              <Download size={16} />
+                              Download
+                            </button>
+                          )}
+                        </>
                       )}
 
                       {!canOpen && !claim && allocation.releaseCondition === 'LEGACY_CLAIM' && (
