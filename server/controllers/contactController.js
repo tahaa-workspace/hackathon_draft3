@@ -4,7 +4,7 @@ import { sendTransactionalEmail } from '../services/mailService.js';
 const CATEGORY_LABELS = {
   GENERAL: 'General Enquiry',
   ACCOUNT_SUPPORT: 'Account Support',
-  BENEFICIARY_SUPPORT: 'Beneficiary Support',
+  BENEFICIARY_SUPPORT: 'Legacy Access Support',
   LEGACY_CLAIM_SUPPORT: 'Legacy Claim Support',
   LEGAL_ADVISOR: 'Legal Advisor Enquiry',
   TECHNICAL: 'Technical Issue',
