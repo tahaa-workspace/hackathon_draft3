@@ -1,11 +1,11 @@
 import crypto from "crypto";
 import Document from "../models/Document.js";
-import User from "../models/User.js";
 import LegacyClaim from "../models/LegacyClaim.js";
 import LegacyAllocation from "../models/LegacyAllocation.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { writeAudit } from "../services/auditService.js";
+import { validateUploadedFile } from "../services/fileValidationService.js";
 
 const RECORD_TYPES = ["GENERAL", "ASSET", "LIABILITY"];
 
@@ -183,35 +183,11 @@ export const uploadDocument = async (req, res) => {
     let placeholderUpload = null;
 
     try {
-        if (!req.file) {
+        const fileValidation = validateUploadedFile(req.file);
+
+        if (!fileValidation.valid) {
             return res.status(400).json({
-                message: "Please select a file.",
-            });
-        }
-
-        if (!req.file.size) {
-            return res.status(400).json({
-                message: "Empty files cannot be uploaded.",
-            });
-        }
-
-        const extension = String(req.file.originalname || "")
-            .toLowerCase()
-            .match(/\.[a-z0-9]+$/)?.[0];
-
-        const extensionByMime = {
-            "application/pdf": [".pdf"],
-            "image/jpeg": [".jpg", ".jpeg"],
-            "image/png": [".png"],
-        };
-
-        if (
-            !extension ||
-            !extensionByMime[req.file.mimetype]?.includes(extension)
-        ) {
-            return res.status(400).json({
-                message:
-                    "The file extension does not match the uploaded file type.",
+                message: fileValidation.message,
             });
         }
 
@@ -234,6 +210,21 @@ export const uploadDocument = async (req, res) => {
             .createHash("sha256")
             .update(req.file.buffer)
             .digest("hex");
+
+        const duplicate = await Document.findOne({
+            ownerId: req.user.id,
+            sha256,
+        }).select("_id title");
+
+        if (duplicate) {
+            return res.status(409).json({
+                message:
+                    'This exact file is already stored in your vault as "' +
+                    duplicate.title +
+                    '".',
+                duplicateDocumentId: duplicate._id.toString(),
+            });
+        }
 
         const { encrypted, iv, authTag } = encryptBuffer(req.file.buffer);
 
@@ -313,59 +304,6 @@ export const getDocuments = async (req, res) => {
 
         return res.status(500).json({
             message: "Failed to fetch documents.",
-        });
-    }
-};
-
-export const updateDocumentBeneficiaries = async (req, res) => {
-    try {
-        const { beneficiaryIds } = req.body;
-
-        if (!Array.isArray(beneficiaryIds)) {
-            return res.status(400).json({
-                message: "beneficiaryIds must be an array.",
-            });
-        }
-
-        const document = await Document.findOne({
-            _id: req.params.id,
-            ownerId: req.user.id,
-        });
-
-        if (!document) {
-            return res.status(404).json({
-                message: "Document not found.",
-            });
-        }
-
-        const uniqueIds = [...new Set(beneficiaryIds.map(String))];
-
-        if (uniqueIds.length > 0) {
-            const validBeneficiaries = await User.find({
-                _id: { $in: uniqueIds },
-                role: "BENEFICIARY",
-                createdBy: req.user.id,
-            }).select("_id");
-
-            if (validBeneficiaries.length !== uniqueIds.length) {
-                return res.status(400).json({
-                    message: "One or more selected beneficiaries do not belong to this owner.",
-                });
-            }
-        }
-
-        document.assignedBeneficiaries = uniqueIds;
-        await document.save();
-
-        return res.status(200).json({
-            message: "Document access updated successfully.",
-            document: documentPayload(document),
-        });
-    } catch (error) {
-        console.error("Update document beneficiaries error:", error);
-
-        return res.status(500).json({
-            message: "Failed to update document access.",
         });
     }
 };
