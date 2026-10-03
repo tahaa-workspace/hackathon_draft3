@@ -1,6 +1,6 @@
 import transporter, { getMailFrom } from '../config/mailer.js';
 
-export async function sendTransactionalEmail({ to, subject, text, html }) {
+export async function sendTransactionalEmail({ to, subject, text, html, replyTo }) {
   if (!to) {
     throw new Error('Email recipient is required.');
   }
@@ -11,6 +11,7 @@ export async function sendTransactionalEmail({ to, subject, text, html }) {
     subject,
     text,
     html,
+    ...(replyTo ? { replyTo } : {}),
   });
 
   return info;
