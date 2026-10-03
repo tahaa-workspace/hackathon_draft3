@@ -22,7 +22,6 @@ import {
   rejectLegacyClaim,
   getAdditionalEvidenceFile,
 } from '../controllers/legacyClaimInformationController.js';
-import { cleanupOrphanLegacyClaims } from '../controllers/legacyClaimCleanupController.js';
 
 const router = Router();
 
@@ -61,7 +60,6 @@ router.get(
   '/admin',
   protect,
   authorize('ADMIN'),
-  cleanupOrphanLegacyClaims,
   listAdminLegacyClaims
 );
 
