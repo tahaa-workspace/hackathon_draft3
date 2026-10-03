@@ -6,6 +6,7 @@ import {
   uploadEncryptedLawyerCredential,
   deleteEncryptedLawyerCredential,
 } from '../services/lawyerCredentialEncryptionService.js';
+import { validateUploadedFile } from '../services/fileValidationService.js';
 
 const SALT_ROUNDS = 12;
 
@@ -84,6 +85,18 @@ export async function registerLawyer(req, res) {
   if (!req.file) {
     return res.status(400).json({
       message: 'Professional credential proof image or PDF is required for lawyer registration.',
+    });
+  }
+
+  const credentialValidation =
+    validateUploadedFile(
+      req.file
+    );
+
+  if (!credentialValidation.valid) {
+    return res.status(400).json({
+      message:
+        credentialValidation.message,
     });
   }
 
