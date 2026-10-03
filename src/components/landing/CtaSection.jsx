@@ -29,8 +29,7 @@ export default function CtaSection({
                 </h2>
 
                 <p className="mt-5 max-w-2xl text-sm leading-7 text-ink-300">
-                  Organize important documents, create trusted beneficiaries
-                  and stay in control of who can access your information.
+                  Organize important documents, allocate selected records to trusted users\n                  and stay in control of who can receive your information.
                 </p>
 
                 <button
@@ -47,8 +46,8 @@ export default function CtaSection({
               </div>
 
               <div className="grid gap-3">
-                <DifferenceItem text="Verified Owner accounts" />
-                <DifferenceItem text="Owner-created beneficiaries" />
+                <DifferenceItem text="Verified user accounts" />
+                <DifferenceItem text="User-to-user legacy allocations" />
                 <DifferenceItem text="Document-level permissions" />
                 <DifferenceItem text="Protected vault access" />
               </div>
