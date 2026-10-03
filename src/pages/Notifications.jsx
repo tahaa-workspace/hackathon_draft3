@@ -34,6 +34,7 @@ export default function Notifications() {
       setItems((current) =>
         current.map((item) => item.id === id ? { ...item, isRead: true } : item)
       );
+      window.dispatchEvent(new Event('nextgen:notifications-changed'));
     } catch (error) {
       setMessage(error.message);
     }
@@ -43,6 +44,7 @@ export default function Notifications() {
     try {
       await markAllNotificationsRead();
       setItems((current) => current.map((item) => ({ ...item, isRead: true })));
+      window.dispatchEvent(new Event('nextgen:notifications-changed'));
     } catch (error) {
       setMessage(error.message);
     }
