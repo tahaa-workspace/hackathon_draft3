@@ -243,9 +243,46 @@ claim.lawyerReview.action =
     claim.status = 'MORE_INFORMATION_REQUIRED';
     await claim.save();
 
+    const claimant = await User.findById(claim.claimantId || claim.beneficiaryId)
+      .select('name email');
+
+    if (claimant) {
+      const appUrl =
+        (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+          .replace(/\/$/, '') + '/legacy-access';
+
+      await createNotification({
+        req,
+        recipientId: claimant._id,
+        type: 'LAWYER_REVIEW',
+        title: 'Additional claim information required',
+        message,
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: claimant.email,
+        emailContent: claimStageTemplate({
+          recipientName: claimant.name,
+          subject: 'Additional Legacy Claim Information Required – NextGen Vault',
+          message,
+          appUrl,
+        }),
+      });
+    }
+
+    await writeAudit(req, {
+      action: 'LEGACY_CLAIM_INFORMATION_REQUESTED',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: 'Assigned lawyer requested additional claim evidence.',
+      metadata: {
+        informationRequestId:
+          claim.informationRequests[claim.informationRequests.length - 1]._id.toString(),
+      },
+    });
+
     const latest = claim.informationRequests[claim.informationRequests.length - 1];
     return res.json({
-      message: 'Additional information requested from the Beneficiary.',
+      message: 'Additional information requested from the claimant.',
       status: claim.status,
       informationRequest: requestPayload(latest),
     });
@@ -296,6 +333,51 @@ export async function submitAdditionalInformation(req, res) {
     pendingRequest.status = 'SUBMITTED';
     claim.status = pendingRequest.returnStatus;
     await claim.save();
+
+    const reviewer = await User.findById(pendingRequest.requestedBy)
+      .select('name email');
+
+    if (reviewer) {
+      const reviewUrl =
+        (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+          .replace(/\/$/, '') +
+        (pendingRequest.requestedByRole === 'ADMIN'
+          ? '/admin/legacy-claims'
+          : '/lawyer');
+
+      await createNotification({
+        req,
+        recipientId: reviewer._id,
+        type:
+          pendingRequest.requestedByRole === 'ADMIN'
+            ? 'ADMIN_REVIEW'
+            : 'LAWYER_REVIEW',
+        title: 'Additional claim evidence submitted',
+        message:
+          'The claimant submitted the additional information you requested.',
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: reviewer.email,
+        emailContent: claimStageTemplate({
+          recipientName: reviewer.name,
+          subject: 'Additional Claim Evidence Submitted – NextGen Vault',
+          message:
+            'The claimant submitted the additional information you requested.',
+          appUrl: reviewUrl,
+        }),
+      });
+    }
+
+    await writeAudit(req, {
+      action: 'LEGACY_CLAIM_ADDITIONAL_INFORMATION_SUBMITTED',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: 'Claimant submitted requested additional evidence.',
+      metadata: {
+        informationRequestId: pendingRequest._id.toString(),
+        fileCount: storedFiles.length,
+      },
+    });
 
     return res.json({
       message: `Additional evidence submitted. The claim has returned to ${pendingRequest.requestedByRole === 'ADMIN' ? 'Admin' : 'Lawyer'} review.`,
