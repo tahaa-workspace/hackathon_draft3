@@ -187,6 +187,32 @@ export const uploadDocument = async (req, res) => {
             });
         }
 
+        if (!req.file.size) {
+            return res.status(400).json({
+                message: "Empty files cannot be uploaded.",
+            });
+        }
+
+        const extension = String(req.file.originalname || "")
+            .toLowerCase()
+            .match(/\.[a-z0-9]+$/)?.[0];
+
+        const extensionByMime = {
+            "application/pdf": [".pdf"],
+            "image/jpeg": [".jpg", ".jpeg"],
+            "image/png": [".png"],
+        };
+
+        if (
+            !extension ||
+            !extensionByMime[req.file.mimetype]?.includes(extension)
+        ) {
+            return res.status(400).json({
+                message:
+                    "The file extension does not match the uploaded file type.",
+            });
+        }
+
         const { title, category } = req.body;
         const recordType = normalizeRecordType(req.body.recordType);
 
@@ -372,7 +398,61 @@ export const getAssignedDocuments = async (req, res) => {
     }
 };
 
-export const getDocumentAccessUrl = async (req, res) => {
+async function resolveDocumentAuthorization(document, userId, requireDownload = false) {
+    const isOwner = document.ownerId.toString() === userId;
+
+    if (isOwner) {
+        return { allowed: true, isOwner, allocation: null };
+    }
+
+    const allocation = await LegacyAllocation.findOne({
+        assetId: document._id,
+        allocatedTo: userId,
+        status: { $ne: "REVOKED" },
+    });
+
+    if (!allocation) {
+        return { allowed: false, isOwner: false, allocation: null };
+    }
+
+    const permissionAllowed = requireDownload
+        ? Boolean(allocation.permissions?.download)
+        : Boolean(allocation.permissions?.view);
+
+    if (!permissionAllowed) {
+        return { allowed: false, isOwner: false, allocation };
+    }
+
+    if (allocation.releaseCondition === "IMMEDIATE" || allocation.status === "RELEASED") {
+        return { allowed: true, isOwner: false, allocation };
+    }
+
+    if (
+        allocation.releaseCondition === "DATE" &&
+        allocation.releaseDate &&
+        new Date(allocation.releaseDate) <= new Date()
+    ) {
+        return { allowed: true, isOwner: false, allocation };
+    }
+
+    if (allocation.releaseCondition === "LEGACY_CLAIM") {
+        const approvedClaim = await LegacyClaim.exists({
+            allocationId: allocation._id,
+            claimantId: userId,
+            status: "APPROVED_INFORMATION_RELEASED",
+        });
+
+        return {
+            allowed: Boolean(approvedClaim),
+            isOwner: false,
+            allocation,
+        };
+    }
+
+    return { allowed: false, isOwner: false, allocation };
+}
+
+async function streamAuthorizedDocument(req, res, disposition = "inline") {
     try {
         const document = await Document.findById(req.params.id);
 
@@ -380,39 +460,18 @@ export const getDocumentAccessUrl = async (req, res) => {
             return res.status(404).json({ message: "Document not found." });
         }
 
-        const isOwner = document.ownerId.toString() === req.user.id;
-        let allocationAccess = false;
+        const requireDownload = disposition === "attachment";
+        const access = await resolveDocumentAuthorization(
+            document,
+            req.user.id,
+            requireDownload
+        );
 
-        if (!isOwner && req.user.role === "USER") {
-            const allocation = await LegacyAllocation.findOne({
-                assetId: document._id,
-                allocatedTo: req.user.id,
-                status: { $ne: "REVOKED" },
-            });
-
-            if (allocation) {
-                if (allocation.releaseCondition === "IMMEDIATE" || allocation.status === "RELEASED") {
-                    allocationAccess = Boolean(allocation.permissions?.view);
-                } else if (
-                    allocation.releaseCondition === "DATE" &&
-                    allocation.releaseDate &&
-                    new Date(allocation.releaseDate) <= new Date()
-                ) {
-                    allocationAccess = Boolean(allocation.permissions?.view);
-                } else {
-                    const approvedClaim = await LegacyClaim.exists({
-                        allocationId: allocation._id,
-                        claimantId: req.user.id,
-                        status: "APPROVED_INFORMATION_RELEASED",
-                    });
-                    allocationAccess = Boolean(approvedClaim && allocation.permissions?.view);
-                }
-            }
-        }
-
-        if (!isOwner && !allocationAccess) {
+        if (!access.allowed) {
             return res.status(403).json({
-                message: "This legacy asset is locked until its allocation release conditions are satisfied.",
+                message: requireDownload
+                    ? "You do not currently have permission to download this document."
+                    : "This legacy asset is locked until its allocation release conditions are satisfied.",
             });
         }
 
@@ -424,7 +483,8 @@ export const getDocumentAccessUrl = async (req, res) => {
             !document.encryption?.authTag
         ) {
             return res.status(409).json({
-                message: "This document was uploaded before vault encryption was enabled. Please re-upload it securely.",
+                message:
+                    "This document was uploaded before vault encryption was enabled. Please re-upload it securely.",
             });
         }
 
@@ -438,16 +498,23 @@ export const getDocumentAccessUrl = async (req, res) => {
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader(
             "Content-Disposition",
-            `inline; filename*=UTF-8''${encodeURIComponent(document.originalName)}`
+            `${disposition}; filename*=UTF-8''${encodeURIComponent(document.originalName)}`
         );
 
         await writeAudit(req, {
-            action: "ASSET_VIEWED",
+            action: requireDownload ? "DOCUMENT_DOWNLOADED" : "DOCUMENT_VIEWED",
             entityType: "Document",
             entityId: document._id,
-            description: isOwner
-                ? "User viewed an owned encrypted vault record."
-                : "Allocation recipient viewed an unlocked legacy asset.",
+            description: access.isOwner
+                ? requireDownload
+                    ? "User downloaded an owned encrypted vault record."
+                    : "User viewed an owned encrypted vault record."
+                : requireDownload
+                    ? "Allocation recipient downloaded an unlocked legacy asset."
+                    : "Allocation recipient viewed an unlocked legacy asset.",
+            metadata: {
+                allocationId: access.allocation?._id?.toString() || null,
+            },
         });
 
         return res.status(200).send(originalFile);
@@ -455,9 +522,16 @@ export const getDocumentAccessUrl = async (req, res) => {
         console.error("Document access error:", error);
         return res.status(500).json({
             message: "Failed to access document.",
-            error: error.message,
         });
     }
+}
+
+export const getDocumentAccessUrl = async (req, res) => {
+    return streamAuthorizedDocument(req, res, "inline");
+};
+
+export const downloadDocument = async (req, res) => {
+    return streamAuthorizedDocument(req, res, "attachment");
 };
 
 export const getMyDocuments = async (req, res) => {
