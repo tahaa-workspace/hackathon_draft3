@@ -123,20 +123,26 @@ export async function createLegacyAllocation(req, res) {
       download: permissions.download !== false,
     };
 
-    const existingAllocation = await LegacyAllocation.exists({
-      assetId: asset._id,
-      allocatedTo: recipient._id,
-      status: { $nin: ['REVOKED', 'EXPIRED'] },
-      releaseCondition: 'LEGACY_CLAIM',
-      releaseDate: null,
-      'permissions.view': normalizedPermissions.view,
-      'permissions.download': normalizedPermissions.download,
-    });
+    const existingAllocation = await populate(
+      LegacyAllocation.findOne({
+        assetId: asset._id,
+        allocatedTo: recipient._id,
+        status: { $nin: ['REVOKED', 'EXPIRED'] },
+        releaseCondition: 'LEGACY_CLAIM',
+        releaseDate: null,
+        'permissions.view': normalizedPermissions.view,
+        'permissions.download': normalizedPermissions.download,
+      })
+    );
 
     if (existingAllocation) {
       return res.status(409).json({
         message:
           'An active allocation with the same asset, recipient, permissions, and release condition already exists.',
+        allocation:
+          allocationPayload(
+            existingAllocation
+          ),
       });
     }
 
