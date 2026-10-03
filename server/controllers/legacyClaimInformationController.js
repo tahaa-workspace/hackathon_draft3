@@ -652,7 +652,7 @@ export async function rejectLegacyClaim(
 export async function getAdditionalEvidenceFile(req, res) {
   try {
     const claim = await LegacyClaim.findById(req.params.id).select(
-      'beneficiaryId assignedLawyerId informationRequests'
+      'claimantId beneficiaryId assignedLawyerId informationRequests'
     );
     if (!claim) return res.status(404).json({ message: 'Legacy Access Claim not found.' });
     if (!canReadClaim(claim, req.user)) {
