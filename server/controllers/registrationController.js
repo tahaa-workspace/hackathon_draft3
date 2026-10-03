@@ -1189,7 +1189,6 @@ export async function registerOwner(
     username,
     email: rawEmail,
     phone: rawPhone,
-    phoneVerificationToken,
     password,
     confirmPassword,
   } = req.body;
@@ -1209,7 +1208,6 @@ export async function registerOwner(
     !username ||
     !email ||
     !phone ||
-    !phoneVerificationToken ||
     !password ||
     !confirmPassword
   ) {
@@ -1217,7 +1215,7 @@ export async function registerOwner(
       .status(400)
       .json({
         message:
-          'Name, username, email, verified mobile number, password, and confirmation are required.',
+          'Name, username, email, mobile number, password, and confirmation are required.',
       });
   }
 
@@ -1231,19 +1229,6 @@ export async function registerOwner(
       .json({
         message:
           'Enter a valid email address.',
-      });
-  }
-
-  if (
-    !isAllowedDemoMobile(
-      phone
-    )
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          'Demo mobile verification is enabled for this build. Use one of the configured test mobile numbers.',
       });
   }
 
@@ -1277,38 +1262,6 @@ export async function registerOwner(
       .json({
         message:
           'Password must be at least 8 characters long.',
-      });
-  }
-
-  const phoneProof =
-    await RegistrationPhoneVerification
-      .findOne({
-        phone,
-        tokenHash:
-          hashToken(
-            String(
-              phoneVerificationToken
-            )
-          ),
-        verifiedAt: {
-          $ne:
-            null,
-        },
-        expiresAt: {
-          $gt:
-            new Date(),
-        },
-      })
-      .select(
-        '+tokenHash'
-      );
-
-  if (!phoneProof) {
-    return res
-      .status(403)
-      .json({
-        message:
-          'Mobile verification is missing or expired. Verify your mobile number again.',
       });
   }
 
@@ -1370,7 +1323,7 @@ export async function registerOwner(
           false,
         phone,
         phoneVerified:
-          true,
+          false,
         passwordHash,
         role:
           'USER',
@@ -1406,11 +1359,6 @@ export async function registerOwner(
             null,
         },
       });
-
-    await RegistrationPhoneVerification.deleteOne({
-      _id:
-        phoneProof._id,
-    });
 
     await RegistrationEmailVerification.deleteOne({
       email:
