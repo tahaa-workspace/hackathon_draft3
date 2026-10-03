@@ -1,5 +1,5 @@
 import ContactMessage from '../models/ContactMessage.js';
-import transporter from '../config/mailer.js';
+import { sendTransactionalEmail } from '../services/mailService.js';
 
 const CATEGORY_LABELS = {
   GENERAL: 'General Enquiry',
@@ -58,13 +58,16 @@ export async function submitContactMessage(req, res) {
       message,
     });
 
-    const receiver = process.env.CONTACT_RECEIVER_EMAIL || process.env.EMAIL_USER;
+    const receiver =
+      process.env.CONTACT_RECEIVER_EMAIL ||
+      process.env.MAIL_USER ||
+      process.env.EMAIL_USER;
+
     let notificationSent = false;
 
-    if (receiver && process.env.EMAIL_USER && process.env.EMAIL_APP_PASSWORD) {
+    if (receiver) {
       try {
-        await transporter.sendMail({
-          from: `"NextGen Vault Contact" <${process.env.EMAIL_USER}>`,
+        await sendTransactionalEmail({
           to: receiver,
           replyTo: email,
           subject: `[NextGen Vault] ${CATEGORY_LABELS[category]} - ${subject}`,
