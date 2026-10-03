@@ -717,6 +717,20 @@ export default function AdminDashboard() {
                           <p className="text-xs text-slate-400">
                             {item.email}
                           </p>
+                          {item.role === 'USER' && (
+                            <p
+                              className={
+                                'mt-1 text-[11px] font-semibold ' +
+                                (item.emailVerified
+                                  ? 'text-emerald-600'
+                                  : 'text-amber-600')
+                              }
+                            >
+                              {item.emailVerified
+                                ? 'Email verified'
+                                : 'Email verification pending'}
+                            </p>
+                          )}
                           <p className="text-xs text-slate-400">
                             @{item.username}
                           </p>
@@ -846,8 +860,8 @@ export default function AdminDashboard() {
                                 handleReject(item)
                               }
                               disabled={
-                                actionLoadingId ===
-                                item.id
+                                actionLoadingId === item.id ||
+                                (item.role === 'USER' && !item.emailVerified)
                               }
                               className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
                             >
