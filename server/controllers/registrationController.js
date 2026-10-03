@@ -864,85 +864,44 @@ export async function requestRegistrationEmailOTP(
     }
 
 
-    const demoEmailOtpEnabled =
-      process.env.DEMO_EMAIL_OTP === 'true';
+    try {
+      const emailContent = registrationOtpTemplate({
+        name: email,
+        otp,
+      });
 
+      await sendTransactionalEmail({
+        to: email,
+        ...emailContent,
+      });
+    } catch (mailError) {
+      await RegistrationEmailVerification.deleteOne({
+        email,
+      });
 
-    if (demoEmailOtpEnabled) {
-
-      console.log(
-        '\n==============================================='
+      console.error(
+        'Registration email OTP send error:',
+        mailError
       );
 
-      console.log(
-        'NEXT GEN VAULT - DEMO EMAIL REGISTRATION OTP'
-      );
-
-      console.log(
-        `Email: ${email}`
-      );
-
-      console.log(
-        `OTP: ${otp}`
-      );
-
-      console.log(
-        'Valid for: 5 minutes'
-      );
-
-      console.log(
-        '===============================================\n'
-      );
-
-    } else {
-
-      try {
-
-        const emailContent = registrationOtpTemplate({
-          name: email,
-          otp,
+      return res
+        .status(500)
+        .json({
+          message:
+            'Unable to send the email OTP. Please check the email configuration and try again.',
         });
-
-        await sendTransactionalEmail({
-          to: email,
-          ...emailContent,
-        });
-
-      } catch (mailError) {
-
-        await RegistrationEmailVerification.deleteOne({
-          email,
-        });
-
-
-        console.error(
-          'Registration email OTP send error:',
-          mailError
-        );
-
-
-        return res
-          .status(500)
-          .json({
-            message:
-              'Unable to send the email OTP. Please check the email configuration and try again.',
-          });
-      }
     }
-
 
     return res
       .status(200)
       .json({
         message:
-          demoEmailOtpEnabled
-            ? 'Demo email OTP generated. Check the backend terminal for the 6-digit OTP.'
-            : 'OTP sent to your email address.',
+          'OTP sent to your email address.',
 
         email,
 
         demoMode:
-          demoEmailOtpEnabled,
+          false,
 
         expiresInSeconds:
           OTP_EXPIRY_MS /
