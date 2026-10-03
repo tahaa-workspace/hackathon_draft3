@@ -6,6 +6,7 @@ import User from '../models/User.js';
 import { createNotification } from '../services/notificationService.js';
 import { claimStageTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
+import { validateUploadedFile } from '../services/fileValidationService.js';
 
 function getEncryptionKey() {
   const configuredKey = process.env.DOCUMENT_ENCRYPTION_KEY;
@@ -325,6 +326,15 @@ export async function submitAdditionalInformation(req, res) {
     const files = Array.isArray(req.files) ? req.files : [];
     if (files.length === 0) {
       return res.status(400).json({ message: 'Upload at least one requested supporting document.' });
+    }
+
+    for (const file of files) {
+      const validation = validateUploadedFile(file);
+      if (!validation.valid) {
+        return res.status(400).json({
+          message: validation.message,
+        });
+      }
     }
 
     const storedFiles = [];
