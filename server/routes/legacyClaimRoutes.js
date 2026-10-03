@@ -37,7 +37,7 @@ function blockDeprecatedReviewActions(req, res, next) {
 
   if (action === 'REQUEST_CORRECTION' || action === 'REQUEST_MORE_INFORMATION') {
     return res.status(400).json({
-      message: 'Use the Request More Information workflow so the Beneficiary can upload additional evidence and preserve the claim history.',
+      message: 'Use the dedicated Request More Information workflow so the claimant can upload additional evidence and preserve the claim history.',
     });
   }
 
@@ -73,7 +73,7 @@ router.get('/:id/information-requests', protect, authorize('ADMIN', 'USER', 'LAW
 router.put(
   '/:id/request-more-information',
   protect,
-  authorize('LAWYER'),
+  authorize('ADMIN', 'LAWYER'),
   requestMoreInformation
 );
 router.put('/:id/reject', protect, authorize('ADMIN', 'LAWYER'), rejectLegacyClaim);
