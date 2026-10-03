@@ -1349,11 +1349,33 @@ export async function registerOwner(
 
       verificationEmailSent =
         true;
+
+      await writeAudit(req, {
+        action: 'EMAIL_SENT',
+        entityType: 'User',
+        entityId: user._id,
+        description: 'Registration verification email sent.',
+        metadata: {
+          emailType: 'REGISTRATION_VERIFICATION',
+        },
+      });
     } catch (mailError) {
       console.error(
         'Registration verification email failed:',
         mailError.message
       );
+
+      await writeAudit(req, {
+        action: 'EMAIL_FAILED',
+        entityType: 'User',
+        entityId: user._id,
+        description: 'Registration verification email failed.',
+        metadata: {
+          emailType: 'REGISTRATION_VERIFICATION',
+          reason: mailError.message,
+        },
+        status: 'FAILED',
+      });
     }
 
     await writeAudit(req, {
@@ -1617,6 +1639,16 @@ export async function resendRegistrationVerification(
       user
     );
 
+    await writeAudit(req, {
+      action: 'EMAIL_SENT',
+      entityType: 'User',
+      entityId: user._id,
+      description: 'Registration verification email resent.',
+      metadata: {
+        emailType: 'REGISTRATION_VERIFICATION_RESEND',
+      },
+    });
+
     return res
       .status(200)
       .json({
@@ -1628,6 +1660,18 @@ export async function resendRegistrationVerification(
       'Resend registration verification error:',
       error
     );
+
+    await writeAudit(req, {
+      action: 'EMAIL_FAILED',
+      entityType: 'User',
+      description: 'Registration verification resend failed.',
+      metadata: {
+        emailType: 'REGISTRATION_VERIFICATION_RESEND',
+        email: normalizeEmail(req.body?.email),
+        reason: error.message,
+      },
+      status: 'FAILED',
+    });
 
     return res
       .status(500)
