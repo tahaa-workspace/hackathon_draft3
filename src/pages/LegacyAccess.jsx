@@ -14,8 +14,10 @@ import Navbar from '../components/Navbar';
 import {
   downloadDocument,
   getIncomingAllocations,
+  getLawyersForSelection,
   getMyLegacyClaims,
   openDocument,
+  selectClaimLawyer,
   submitLegacyClaim,
 } from '../services/legacyService';
 
@@ -70,6 +72,9 @@ export default function LegacyAccess() {
   const [message, setMessage] = useState('');
   const [claimingId, setClaimingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [lawyers, setLawyers] = useState([]);
+  const [selectedLawyerByClaim, setSelectedLawyerByClaim] = useState({});
+  const [lawyerLoadingId, setLawyerLoadingId] = useState(null);
 
   const [form, setForm] = useState({
     identityProofType: 'AADHAAR',
@@ -98,6 +103,16 @@ export default function LegacyAccess() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!claims.some((claim) => claim.status === 'LEGACY_ACCESS_REQUESTED')) {
+      return;
+    }
+
+    getLawyersForSelection()
+      .then(setLawyers)
+      .catch(() => setLawyers([]));
+  }, [claims]);
 
   const visibleCount = useMemo(() => allocations.length, [allocations]);
 
@@ -130,6 +145,29 @@ export default function LegacyAccess() {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       setMessage(error.message);
+    }
+  };
+
+  const assignLawyer = async (claimId) => {
+    const lawyerId = selectedLawyerByClaim[claimId];
+
+    if (!lawyerId) {
+      setMessage('Select an available lawyer.');
+      return;
+    }
+
+    setLawyerLoadingId(claimId);
+    setMessage('');
+
+    try {
+      await selectClaimLawyer(claimId, lawyerId);
+      setMessage('Lawyer selected. Your claim is now under lawyer review.');
+      await refresh();
+      window.dispatchEvent(new Event('nextgen:notifications-changed'));
+    } catch (error) {
+      setMessage(error.message || 'Unable to select lawyer.');
+    } finally {
+      setLawyerLoadingId(null);
     }
   };
 
@@ -310,6 +348,49 @@ export default function LegacyAccess() {
                             </button>
                           )}
                         </>
+                      )}
+
+                      {claim?.status === 'LEGACY_ACCESS_REQUESTED' && (
+                        <div className="w-full rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                          <p className="text-sm font-semibold text-blue-900">
+                            Administrator verification complete
+                          </p>
+                          <p className="mt-1 text-xs text-blue-700">
+                            No lawyer was available for automatic assignment. Select an available lawyer to continue.
+                          </p>
+                          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                            <select
+                              className="field-input flex-1"
+                              value={selectedLawyerByClaim[claim.id] || ''}
+                              onChange={(event) =>
+                                setSelectedLawyerByClaim((current) => ({
+                                  ...current,
+                                  [claim.id]: event.target.value,
+                                }))
+                              }
+                            >
+                              <option value="">Select lawyer</option>
+                              {lawyers.map((lawyer) => (
+                                <option key={lawyer.id} value={lawyer.id}>
+                                  {lawyer.name}{lawyer.city ? ' · ' + lawyer.city : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              disabled={lawyerLoadingId === claim.id}
+                              onClick={() => assignLawyer(claim.id)}
+                            >
+                              {lawyerLoadingId === claim.id ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <ShieldCheck size={16} />
+                              )}
+                              Continue to lawyer review
+                            </button>
+                          </div>
+                        </div>
                       )}
 
                       {!canOpen && !claim && allocation.releaseCondition === 'LEGACY_CLAIM' && (
