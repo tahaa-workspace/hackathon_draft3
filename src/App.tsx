@@ -22,6 +22,7 @@ import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLegacyClaims from './pages/AdminLegacyClaims';
 import AdminAuditLogs from './pages/AdminAuditLogs';
+import AdminRecords from './pages/AdminRecords';
 import UserDashboard from './pages/UserDashboard';
 import LegacyAccess from './pages/LegacyAccess';
 import Notifications from './pages/Notifications';
@@ -213,6 +214,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminLegacyClaims />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/records"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminRecords />
               </ProtectedRoute>
             }
           />
