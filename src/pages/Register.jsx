@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -7,15 +7,12 @@ import {
   FileText,
   Loader2,
   Mail,
-  Smartphone,
   Upload,
 } from 'lucide-react';
 
 import {
   registerUser,
   resendRegistrationVerification,
-  sendRegistrationOTP,
-  verifyRegistrationOTP,
 } from '../services/authService';
 
 import AuthShell from '../components/auth/AuthShell';
@@ -31,7 +28,6 @@ const INITIAL = {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
-const RESEND_SECONDS = 60;
 
 const PASSWORD_RULES = [
   {
@@ -70,115 +66,24 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(false);
-
+  const [resendEmailLoading, setResendEmailLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [verifyLoading, setVerifyLoading] = useState(false);
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [phoneVerificationToken, setPhoneVerificationToken] = useState('');
-  const [verifiedPhone, setVerifiedPhone] = useState('');
-  const [resendIn, setResendIn] = useState(0);
-  const [resendEmailLoading, setResendEmailLoading] = useState(false);
-
-  useEffect(() => {
-    if (resendIn <= 0) return undefined;
-
-    const timer = window.setInterval(() => {
-      setResendIn((value) => Math.max(0, value - 1));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [resendIn]);
-
   const update = (key) => (event) => {
-    const value = event.target.value;
+    let value = event.target.value;
+
+    if (key === 'phone') {
+      value = value.replace(/\D/g, '').slice(0, 10);
+    }
 
     setForm((current) => ({
       ...current,
       [key]: value,
     }));
 
-    if (error) setError('');
-    if (message) setMessage('');
-  };
-
-  const handlePhoneChange = (event) => {
-    const value = event.target.value.replace(/\D/g, '').slice(0, 10);
-
-    setForm((current) => ({
-      ...current,
-      phone: value,
-    }));
-
-    if (value !== verifiedPhone) {
-      setPhoneVerified(false);
-      setPhoneVerificationToken('');
-      setOtp('');
-      setOtpSent(false);
-      setResendIn(0);
-    }
-
     setError('');
     setMessage('');
-  };
-
-  const handleSendOtp = async () => {
-    setError('');
-    setMessage('');
-
-    if (!isValidIndianMobile(form.phone)) {
-      setError('Mobile number must contain exactly 10 digits.');
-      return;
-    }
-
-    setOtpLoading(true);
-
-    try {
-      const result = await sendRegistrationOTP(form.phone);
-      setOtpSent(true);
-      setOtp('');
-      setPhoneVerified(false);
-      setPhoneVerificationToken('');
-      setVerifiedPhone('');
-      setResendIn(RESEND_SECONDS);
-      setMessage(result.message || 'Verification OTP generated.');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    setError('');
-    setMessage('');
-
-    if (!/^\d{6}$/.test(otp)) {
-      setError('Enter the 6-digit mobile verification code.');
-      return;
-    }
-
-    setVerifyLoading(true);
-
-    try {
-      const result = await verifyRegistrationOTP(form.phone, otp);
-      setPhoneVerified(true);
-      setPhoneVerificationToken(result.verificationToken);
-      setVerifiedPhone(form.phone);
-      setOtpSent(false);
-      setResendIn(0);
-      setMessage(result.message || 'Mobile number verified successfully.');
-    } catch (err) {
-      setPhoneVerified(false);
-      setPhoneVerificationToken('');
-      setError(err.message);
-    } finally {
-      setVerifyLoading(false);
-    }
   };
 
   const handleFile = (event) => {
@@ -229,11 +134,6 @@ export default function Register() {
       return;
     }
 
-    if (!phoneVerified || !phoneVerificationToken) {
-      setError('Verify your mobile number before submitting registration.');
-      return;
-    }
-
     if (!isStrongPassword(form.password)) {
       setError(
         'Password must be at least 8 characters and include an uppercase letter, a number, and a special character.'
@@ -256,7 +156,6 @@ export default function Register() {
     try {
       const result = await registerUser({
         ...form,
-        phoneVerificationToken,
         aadhaar,
       });
 
@@ -298,11 +197,11 @@ export default function Register() {
           <div className="alert-success flex items-start gap-3">
             <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
             <span>
-              Your account has been created and your Aadhaar document was
-              received securely. {verificationEmailSent
-                ? `A verification link was sent to ${form.email}.`
+              Your account and encrypted Aadhaar submission were created successfully.{' '}
+              {verificationEmailSent
+                ? `A single-use verification link was sent to ${form.email}.`
                 : 'The verification email could not be delivered yet.'}
-              {' '}Your account also requires administrator approval before login.
+              {' '}Administrator approval is also required before login.
             </span>
           </div>
 
@@ -342,7 +241,7 @@ export default function Register() {
     <AuthShell
       variant="wide"
       title="Create a user account"
-      subtitle="Verify your mobile number, upload Aadhaar, and confirm your email from the secure link we send after registration"
+      subtitle="Register once, verify your email from the secure link we send, and use the same account to own and receive legacy assets"
       footer={
         <p className="text-sm text-ink-500">
           Already registered?{' '}
@@ -389,120 +288,49 @@ export default function Register() {
           </div>
         </div>
 
-        <div className="registration-verification-card">
-          <div className="mb-3 flex items-center gap-2">
-            <Mail size={17} className="text-brand-700" />
-            <p className="text-sm font-semibold text-ink-800">
-              Email verification
+        <div className="registration-two-column">
+          <div>
+            <label className="field-label" htmlFor="email">
+              Email
+            </label>
+            <div className="relative">
+              <Mail size={16} className="absolute left-3 top-3.5 text-ink-400" />
+              <input
+                id="email"
+                type="email"
+                className="field-input pl-10"
+                value={form.email}
+                onChange={update('email')}
+                autoComplete="email"
+                required
+              />
+            </div>
+            <p className="mt-1 text-xs text-ink-400">
+              A single-use verification link will be sent here after registration.
             </p>
           </div>
 
-          <label className="field-label" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            className="field-input"
-            value={form.email}
-            onChange={update('email')}
-            autoComplete="email"
-            required
-          />
-          <p className="mt-2 text-xs leading-5 text-ink-500">
-            After registration, NextGen Vault sends a single-use verification
-            link to this address. SMTP credentials are used only to send the
-            email; this address is always the recipient.
-          </p>
-        </div>
-
-        <div className="registration-verification-card">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Smartphone size={17} className="text-brand-700" />
-              <p className="text-sm font-semibold text-ink-800">
-                Mobile verification
-              </p>
-            </div>
-
-            {phoneVerified && (
-              <span className="registration-verified-badge">
-                <CheckCircle2 size={14} />
-                Verified
-              </span>
-            )}
-          </div>
-
-          <label className="field-label" htmlFor="phone">
-            Mobile number
-          </label>
-
-          <div className="registration-verification-row">
+          <div>
+            <label className="field-label" htmlFor="phone">
+              Mobile number
+            </label>
             <input
               id="phone"
               type="tel"
               inputMode="numeric"
               className="field-input"
               value={form.phone}
-              onChange={handlePhoneChange}
+              onChange={update('phone')}
               placeholder="10-digit mobile number"
               autoComplete="tel"
               minLength={10}
               maxLength={10}
-              disabled={phoneVerified}
               required
             />
-
-            <button
-              type="button"
-              className="btn-secondary registration-otp-button"
-              onClick={handleSendOtp}
-              disabled={
-                otpLoading ||
-                phoneVerified ||
-                (otpSent && resendIn > 0)
-              }
-            >
-              {otpLoading && <Loader2 size={16} className="animate-spin" />}
-              {phoneVerified
-                ? 'Verified'
-                : otpSent
-                  ? resendIn > 0
-                    ? `Resend in ${resendIn}s`
-                    : 'Resend OTP'
-                  : 'Send OTP'}
-            </button>
+            <p className="mt-1 text-xs text-ink-400">
+              Stored for account contact. This build does not claim SMS verification without a configured SMS provider.
+            </p>
           </div>
-
-          {otpSent && !phoneVerified && (
-            <div className="registration-verification-row mt-3">
-              <input
-                type="text"
-                inputMode="numeric"
-                className="field-input"
-                value={otp}
-                onChange={(event) =>
-                  setOtp(
-                    event.target.value
-                      .replace(/\D/g, '')
-                      .slice(0, 6)
-                  )
-                }
-                placeholder="Enter 6-digit OTP"
-                autoComplete="one-time-code"
-              />
-
-              <button
-                type="button"
-                className="btn-primary registration-otp-button"
-                onClick={handleVerifyOtp}
-                disabled={verifyLoading || otp.length !== 6}
-              >
-                {verifyLoading && <Loader2 size={16} className="animate-spin" />}
-                Verify mobile
-              </button>
-            </div>
-          )}
         </div>
 
         <div>
@@ -526,6 +354,7 @@ export default function Register() {
               className="hidden"
               accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
               onChange={handleFile}
+              required
             />
           </label>
         </div>
