@@ -422,6 +422,19 @@ export async function login(req, res) {
   });
 }
 
+export async function logout(req, res) {
+  await writeAudit(req, {
+    action: 'LOGOUT',
+    entityType: 'User',
+    entityId: req.user.id,
+    description: 'User signed out.',
+  });
+
+  return res.status(200).json({
+    message: 'Signed out successfully.',
+  });
+}
+
 // export async function changePassword(req, res) {
 //   const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
