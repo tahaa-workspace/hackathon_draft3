@@ -3,7 +3,8 @@ import crypto from "crypto";
 
 import User from "../models/User.js";
 import ForgotPasswordOTP from "../models/ForgotPasswordOTP.js";
-import transporter from "../config/mailer.js";
+import { sendTransactionalEmail } from "../services/mailService.js";
+import { securityOtpTemplate } from "../services/emailTemplates.js";
 
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
@@ -99,28 +100,15 @@ export async function requestForgotPasswordOTP(req, res) {
     }
 
     try {
-      await transporter.sendMail({
-        from: {
-          name: "NextGen Vault",
-          address: process.env.EMAIL_USER,
-        },
+      const emailContent = securityOtpTemplate({
+        recipientName: user.name || user.username,
+        purpose: 'password reset',
+        otp,
+      });
+
+      await sendTransactionalEmail({
         to: user.email,
-        subject: "NextGen Vault - Password Reset OTP",
-        text: `Hello ${user.name || user.username},\n\nYour password reset OTP is: ${otp}\n\nThis OTP expires in 5 minutes.\n\nIf you did not request this reset, please ignore this email.\n\nNextGen Vault`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px">
-              <h2 style="color:#0f172a;margin-top:0">NextGen Vault</h2>
-              <p style="color:#475569">Hello <strong>${user.name || user.username}</strong>,</p>
-              <p style="color:#475569">Use this verification code to reset your password.</p>
-              <div style="margin:24px 0;padding:18px;background:#f1f5f9;border-radius:10px;text-align:center">
-                <div style="font-size:32px;letter-spacing:10px;font-weight:bold;color:#0f172a">${otp}</div>
-              </div>
-              <p style="color:#64748b">This OTP expires in <strong>5 minutes</strong>.</p>
-              <p style="color:#64748b;font-size:13px">If you did not request a password reset, you can safely ignore this message.</p>
-            </div>
-          </div>
-        `,
+        ...emailContent,
       });
     } catch (mailError) {
       await ForgotPasswordOTP.deleteOne({ userId: user._id });
