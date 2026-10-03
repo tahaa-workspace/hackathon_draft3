@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext";
 import { homeForRole } from "../components/ProtectedRoute";
 
 import AuthShell from "../components/auth/AuthShell";
+import { resendRegistrationVerification } from "../services/authService";
 import AuthInput from "../components/auth/AuthInput";
 import PasswordInput from "../components/auth/PasswordInput";
 
@@ -38,6 +39,9 @@ export default function Login() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState("");
 
   const passwordResetSuccess =
     location.state?.passwordResetSuccess || "";
@@ -46,6 +50,8 @@ export default function Login() {
     e.preventDefault();
 
     setError("");
+    setVerificationMessage("");
+    setVerificationEmail("");
     setLoading(true);
 
     try {
@@ -64,8 +70,29 @@ export default function Login() {
       });
     } catch (err) {
       setError(err.message);
+      if (err?.payload?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+        setVerificationEmail(err.payload.email || identifier);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!verificationEmail) return;
+
+    setResendingVerification(true);
+    setVerificationMessage("");
+
+    try {
+      const result = await resendRegistrationVerification(verificationEmail);
+      setVerificationMessage(
+        result.message || 'A new verification email was sent.'
+      );
+    } catch (err) {
+      setVerificationMessage(err.message || 'Unable to resend verification email.');
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -174,6 +201,26 @@ export default function Login() {
           )}
 
         </AnimatePresence>
+
+        {verificationEmail && (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-xs leading-5 text-amber-800">
+              Verify <strong>{verificationEmail}</strong> before signing in.
+            </p>
+            {verificationMessage && (
+              <p className="mt-2 text-xs text-amber-700">{verificationMessage}</p>
+            )}
+            <button
+              type="button"
+              onClick={resendVerification}
+              disabled={resendingVerification}
+              className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-brand-700"
+            >
+              {resendingVerification && <Loader2 size={14} className="animate-spin" />}
+              Resend verification email
+            </button>
+          </div>
+        )}
 
 
         {/* Login Form */}
