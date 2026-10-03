@@ -15,8 +15,30 @@ import legalRequestRoutes from './routes/legalRequestRoutes.js';
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+const frontendOrigin =
+  process.env.FRONTEND_URL ||
+  process.env.APP_BASE_URL ||
+  'http://localhost:5173';
+
+app.disable('x-powered-by');
+
+app.use(
+  cors({
+    origin: frontendOrigin,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
@@ -36,6 +58,21 @@ app.use((req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err);
+
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      message: 'Uploaded file exceeds the 10 MB size limit.',
+    });
+  }
+
+  if (
+    err.name === 'MulterError' ||
+    /Only PDF, JPG, JPEG and PNG files are allowed/i.test(err.message || '')
+  ) {
+    return res.status(400).json({
+      message: err.message || 'Invalid file upload.',
+    });
+  }
   if (err.name === 'ValidationError' || err.name === 'CastError') {
     return res.status(400).json({ message: 'Invalid request data.' });
   }
