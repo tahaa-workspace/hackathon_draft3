@@ -89,7 +89,6 @@ export async function registerUser({
   username,
   email,
   phone,
-  phoneVerificationToken,
   password,
   confirmPassword,
   aadhaar,
@@ -100,7 +99,6 @@ export async function registerUser({
   formData.append('username', username);
   formData.append('email', email);
   formData.append('phone', phone);
-  formData.append('phoneVerificationToken', phoneVerificationToken);
   formData.append('password', password);
   formData.append('confirmPassword', confirmPassword);
   formData.append('aadhaar', aadhaar);
