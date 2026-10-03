@@ -3,7 +3,8 @@ import crypto from 'crypto';
 
 import User from '../models/User.js';
 import ProfileContactVerification from '../models/ProfileContactVerification.js';
-import transporter from '../config/mailer.js';
+import { sendTransactionalEmail } from '../services/mailService.js';
+import { securityOtpTemplate } from '../services/emailTemplates.js';
 
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
@@ -196,24 +197,15 @@ export async function requestEmailChangeOTP(req, res) {
     }
 
     try {
-      await transporter.sendMail({
-        from: {
-          name: 'NextGen Vault',
-          address: process.env.EMAIL_USER,
-        },
+      const emailContent = securityOtpTemplate({
+        recipientName: user.name || user.username,
+        purpose: 'email address verification',
+        otp: result.otp,
+      });
+
+      await sendTransactionalEmail({
         to: email,
-        subject: 'NextGen Vault - Verify Your New Email',
-        text: `Your NextGen Vault email change OTP is ${result.otp}. It expires in 5 minutes.`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px">
-            <div style="border:1px solid #e2e8f0;border-radius:14px;padding:28px">
-              <h2 style="margin-top:0;color:#0f172a">NextGen Vault</h2>
-              <p style="color:#475569">Use this OTP to verify your new email address.</p>
-              <div style="margin:24px 0;padding:18px;background:#f1f5f9;border-radius:10px;text-align:center;font-size:32px;letter-spacing:10px;font-weight:bold;color:#0f172a">${result.otp}</div>
-              <p style="color:#64748b">This OTP expires in <strong>5 minutes</strong>.</p>
-            </div>
-          </div>
-        `,
+        ...emailContent,
       });
     } catch (mailError) {
       await ProfileContactVerification.deleteOne({
