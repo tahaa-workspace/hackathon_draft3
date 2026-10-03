@@ -5,6 +5,7 @@ import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
 import crypto from "crypto";
 import PasswordChangeOTP from "../models/PasswordChangeOTP.js";
+import { writeAudit } from '../services/auditService.js';
 import transporter from "../config/mailer.js";
 import {
   encryptAadhaarBuffer,
@@ -19,6 +20,7 @@ function publicUser(user) {
     name: user.name,
     username: user.username,
     email: user.email,
+    emailVerified: user.emailVerified,
     role: user.role,
     status: user.status,
     mustChangePassword: user.mustChangePassword,
@@ -310,39 +312,107 @@ export async function registerLawyer(req, res) {
 
 export async function login(req, res) {
   const { identifier, password } = req.body;
+
   if (!identifier || !password) {
-    return res.status(400).json({ message: 'Username/email and password are required.' });
+    return res.status(400).json({
+      message: 'Username/email and password are required.',
+    });
   }
 
+  const normalizedIdentifier =
+    String(identifier)
+      .trim()
+      .toLowerCase();
+
   const user = await User.findOne({
-    $or: [{ username: identifier.toLowerCase() }, { email: identifier.toLowerCase() }],
+    $or: [
+      { username: normalizedIdentifier },
+      { email: normalizedIdentifier },
+    ],
   }).select('+passwordHash');
 
   if (!user) {
-    return res.status(401).json({ message: 'Invalid credentials.' });
+    await writeAudit(req, {
+      action: 'LOGIN_FAILED',
+      entityType: 'User',
+      description: 'Login failed for an unknown username/email.',
+      metadata: { identifier: normalizedIdentifier },
+      status: 'FAILED',
+    });
+
+    return res.status(401).json({
+      message: 'Invalid credentials.',
+    });
   }
 
-  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  const isMatch =
+    await bcrypt.compare(
+      password,
+      user.passwordHash
+    );
+
   if (!isMatch) {
-    return res.status(401).json({ message: 'Invalid credentials.' });
+    await writeAudit(req, {
+      action: 'LOGIN_FAILED',
+      entityType: 'User',
+      entityId: user._id,
+      description: 'Login failed because the password was incorrect.',
+      status: 'FAILED',
+    });
+
+    return res.status(401).json({
+      message: 'Invalid credentials.',
+    });
+  }
+
+  if (!user.emailVerified && user.role === 'USER') {
+    return res.status(403).json({
+      message:
+        'Email verification required. We sent a verification link to your registered email address.',
+      code:
+        'EMAIL_VERIFICATION_REQUIRED',
+      email:
+        user.email,
+    });
   }
 
   if (user.status === 'PENDING') {
-    return res.status(403).json({ message: 'Your account is pending administrator approval.' });
-  }
-  if (user.status === 'REJECTED') {
-    const reason = user.verification?.rejectionReason;
     return res.status(403).json({
-      message: reason
-        ? `Your registration was rejected: ${reason}`
-        : 'Your registration was rejected. Contact an administrator.',
+      message:
+        'Your account is pending administrator approval.',
     });
   }
-  if (user.status !== 'ACTIVE') {
-    return res.status(403).json({ message: 'Your account is not active.' });
+
+  if (user.status === 'REJECTED') {
+    const reason =
+      user.verification?.rejectionReason;
+
+    return res.status(403).json({
+      message:
+        reason
+          ? `Your registration was rejected: ${reason}`
+          : 'Your registration was rejected. Contact an administrator.',
+    });
   }
 
-  const token = generateToken(user);
+  if (user.status !== 'ACTIVE') {
+    return res.status(403).json({
+      message:
+        'Your account is not active.',
+    });
+  }
+
+  const token =
+    generateToken(
+      user
+    );
+
+  await writeAudit(req, {
+    action: 'LOGIN_SUCCESS',
+    entityType: 'User',
+    entityId: user._id,
+    description: 'User logged in successfully.',
+  });
 
   return res.status(200).json({
     message: 'Login successful.',
