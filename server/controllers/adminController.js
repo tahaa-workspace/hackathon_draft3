@@ -5,6 +5,7 @@ import LegacyAllocation from '../models/LegacyAllocation.js';
 import { sendTransactionalEmail } from '../services/mailService.js';
 import { claimStageTemplate } from '../services/emailTemplates.js';
 import { writeAudit } from '../services/auditService.js';
+import { createNotification } from '../services/notificationService.js';
 
 import {
   decryptAadhaarBuffer,
@@ -787,6 +788,18 @@ export async function approveUser(
         });
     }
 
+    if (
+      user.role === 'USER' &&
+      !user.emailVerified
+    ) {
+      return res
+        .status(409)
+        .json({
+          message:
+            'The user must verify their registered email address before administrator approval.',
+        });
+    }
+
     user.status =
       'ACTIVE';
 
@@ -802,6 +815,49 @@ export async function approveUser(
     };
 
     await user.save();
+
+    const approvalMessage =
+      user.role === 'LAWYER'
+        ? 'Your lawyer registration has been approved. Your professional account is now active.'
+        : 'Your NextGen Vault registration has been approved. You may now sign in.';
+
+    await createNotification({
+      req,
+      recipientId: user._id,
+      type: 'SECURITY',
+      title:
+        user.role === 'LAWYER'
+          ? 'Lawyer account approved'
+          : 'Account approved',
+      message: approvalMessage,
+      relatedEntityType: 'User',
+      relatedEntityId: user._id,
+      email: user.email,
+      emailContent: claimStageTemplate({
+        recipientName: user.name || user.username,
+        subject:
+          user.role === 'LAWYER'
+            ? 'Lawyer Account Approved – NextGen Vault'
+            : 'Your NextGen Vault Account Has Been Approved',
+        message: approvalMessage,
+        appUrl:
+          (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+            .replace(/\/$/, '') + '/login',
+      }),
+    });
+
+    await writeAudit(req, {
+      action: 'ACCOUNT_REGISTRATION_APPROVED',
+      entityType: 'User',
+      entityId: user._id,
+      description:
+        user.role === 'LAWYER'
+          ? 'Administrator approved a lawyer registration.'
+          : 'Administrator approved a user registration.',
+      metadata: {
+        role: user.role,
+      },
+    });
 
     return res
       .status(200)
