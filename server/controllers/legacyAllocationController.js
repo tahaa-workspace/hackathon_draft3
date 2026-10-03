@@ -119,15 +119,28 @@ export async function createLegacyAllocation(req, res) {
       return res.status(400).json({ message: 'releaseDate is required for DATE-based release.' });
     }
 
+    const normalizedPermissions = {
+      view: permissions.view !== false,
+      download: permissions.download !== false,
+    };
+
     const existingAllocation = await LegacyAllocation.exists({
       assetId: asset._id,
       allocatedTo: recipient._id,
-      status: { $ne: 'REVOKED' },
+      status: { $nin: ['REVOKED', 'EXPIRED'] },
+      releaseCondition,
+      releaseDate:
+        releaseCondition === 'DATE'
+          ? new Date(releaseDate)
+          : null,
+      'permissions.view': normalizedPermissions.view,
+      'permissions.download': normalizedPermissions.download,
     });
 
     if (existingAllocation) {
       return res.status(409).json({
-        message: 'This user already has an active allocation for this asset.',
+        message:
+          'An active allocation with the same asset, recipient, permissions, and release condition already exists.',
       });
     }
 
@@ -135,10 +148,7 @@ export async function createLegacyAllocation(req, res) {
       assetId: asset._id,
       allocatedBy: req.user.id,
       allocatedTo: recipient._id,
-      permissions: {
-        view: permissions.view !== false,
-        download: Boolean(permissions.download),
-      },
+      permissions: normalizedPermissions,
       releaseCondition,
       releaseDate: releaseCondition === 'DATE' ? new Date(releaseDate) : null,
       status: releaseCondition === 'IMMEDIATE' ? 'RELEASED' : 'ACTIVE',
