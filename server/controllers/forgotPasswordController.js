@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import ForgotPasswordOTP from "../models/ForgotPasswordOTP.js";
 import { sendTransactionalEmail } from "../services/mailService.js";
 import { securityOtpTemplate } from "../services/emailTemplates.js";
+import { writeAudit } from "../services/auditService.js";
 
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
@@ -263,6 +264,13 @@ export async function completeForgotPasswordReset(req, res) {
     await user.save();
 
     await ForgotPasswordOTP.deleteOne({ _id: otpRequest._id });
+
+    await writeAudit(req, {
+      action: 'PASSWORD_RESET',
+      entityType: 'User',
+      entityId: user._id,
+      description: 'User completed a verified password reset.',
+    });
 
     return res.status(200).json({
       message: "Password reset successfully. You can now sign in with your new password.",
