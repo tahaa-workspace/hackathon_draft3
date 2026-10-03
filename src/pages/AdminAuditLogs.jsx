@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Filter, Loader2, Search, ShieldCheck } from 'lucide-react';
 
 import Navbar from '../components/Navbar';
 import { getAdminAuditLogs } from '../services/legacyService';
 
 export default function AdminAuditLogs() {
+  const [searchParams] = useSearchParams();
   const [logs, setLogs] = useState([]);
   const [filters, setFilters] = useState({
-    action: '',
-    entityType: '',
-    status: '',
+    action: searchParams.get('action') || '',
+    entityType: searchParams.get('entityType') || '',
+    entityId: searchParams.get('entityId') || '',
+    status: searchParams.get('status') || '',
   });
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -44,7 +47,7 @@ export default function AdminAuditLogs() {
         </div>
 
         <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <label className="relative">
               <Search size={15} className="absolute left-3 top-3.5 text-slate-400" />
               <input
@@ -64,6 +67,13 @@ export default function AdminAuditLogs() {
                 onChange={(e) => setFilters((v) => ({ ...v, entityType: e.target.value }))}
               />
             </label>
+
+            <input
+              className="field-input"
+              placeholder="Entity ID"
+              value={filters.entityId}
+              onChange={(e) => setFilters((v) => ({ ...v, entityId: e.target.value }))}
+            />
 
             <select
               className="field-input"
