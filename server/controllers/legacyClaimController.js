@@ -1460,202 +1460,180 @@ export async function adminReviewClaim(
   req,
   res
 ) {
-  const {
-    id,
-  } = req.params;
+  try {
+    const { id } = req.params;
+    const { action, remarks = '' } = req.body || {};
 
-  const {
-    action,
-    remarks = '',
-  } =
-    req.body || {};
+    const claim = await LegacyClaim.findById(id);
 
-  const claim =
-    await LegacyClaim.findById(
-      id
-    );
-
-  if (!claim) {
-    return res
-      .status(404)
-      .json({
-        message:
-          'Legacy Access Claim not found.',
+    if (!claim) {
+      return res.status(404).json({
+        message: 'Legacy Access Claim not found.',
       });
-  }
+    }
 
-  if (
-    ![
-      'UNDER_ADMIN_REVIEW',
-      'LEGACY_ACCESS_REQUESTED',
-    ].includes(
-      claim.status
-    )
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          `Claim cannot be reviewed from status ${claim.status}.`,
+    if (claim.status !== 'UNDER_ADMIN_REVIEW') {
+      return res.status(400).json({
+        message: `Claim cannot be reviewed from status ${claim.status}.`,
       });
-  }
+    }
 
-  const beneficiary =
-    await User.findById(
-      claim.beneficiaryId
-    ).select(
-      'role'
-    );
+    const claimant = await User.findById(claim.claimantId || claim.beneficiaryId)
+      .select('name email role status');
 
-  const allocation =
-    claim.allocationId
+    const allocation = claim.allocationId
       ? await LegacyAllocation.findOne({
           _id: claim.allocationId,
           allocatedBy: claim.ownerId,
-          allocatedTo: claim.beneficiaryId,
+          allocatedTo: claim.claimantId || claim.beneficiaryId,
           status: { $ne: 'REVOKED' },
-        }).lean()
+        })
+          .populate('assetId', 'title')
+          .lean()
       : null;
 
-  const validLink =
-    beneficiary?.role === 'USER' &&
-    Boolean(allocation);
-
-  if (
-    action === 'FORWARD'
-  ) {
-    if (
-      !validLink ||
-      !claim
-        .deathCertificate
-        ?.publicId ||
-      !claim
-        .identityProof
-        ?.publicId
-    ) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Platform checks failed: verify Owner-Beneficiary link, assigned records, death certificate, and identity proof.',
-        });
+    if (!claimant || claimant.role !== 'USER' || !allocation) {
+      return res.status(400).json({
+        message:
+          'Claim relationship validation failed. The allocation or claimant is no longer valid.',
+      });
     }
 
-    claim.status =
-      'LEGACY_ACCESS_REQUESTED';
-  } else if (
-    action ===
-    'REQUEST_CORRECTION'
-  ) {
-    claim.status =
-      'MORE_INFORMATION_REQUIRED';
-  } else if (
-  action === 'REJECT'
-) {
+    if (action === 'REQUEST_CORRECTION') {
+      claim.status = 'MORE_INFORMATION_REQUIRED';
+      claim.adminReview = {
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        remarks: String(remarks).trim(),
+      };
+      await claim.save();
 
-  /*
-  |--------------------------------------------------------------------------
-  | DELETE ALL CLAIMANT LEGACY CLAIM FILES
-  |--------------------------------------------------------------------------
-  */
-
-  try {
-
-    await deleteAllClaimFiles(
-      claim
-    );
-
-  } catch (deleteError) {
-
-    console.error(
-      'Legacy Claim file deletion failed:',
-      deleteError
-    );
-
-    return res
-      .status(500)
-      .json({
-        message:
-          'Legacy Claim could not be rejected because its uploaded documents could not be deleted safely.',
-
-        error:
-          deleteError.message,
+      await writeAudit(req, {
+        action: 'ADMIN_REVIEW_REQUESTED_MORE_INFORMATION',
+        entityType: 'LegacyClaim',
+        entityId: claim._id,
+        description: 'Administrator requested more information for a legacy claim.',
       });
-  }
 
-  /*
-  |--------------------------------------------------------------------------
-  | DELETE CLAIM METADATA FROM MONGODB
-  |--------------------------------------------------------------------------
-  */
-
-  await LegacyClaim.deleteOne({
-    _id:
-        clearImmediate._id,
-  });
-
-
-  return res
-    .status(200)
-    .json({
-      message:
-        'Legacy Access Claim rejected. All claimant-uploaded claim documents and metadata have been permanently deleted.',
-
-      deleted:
-        true,
-
-      claimId:
-        claim._id.toString(),
-    });
-  } else if (
-    action === 'HOLD'
-  ) {
-    claim.status =
-      'ON_HOLD_DISPUTED';
-  } else {
-    return res
-      .status(400)
-      .json({
-        message:
-          'Invalid admin review action.',
+      const populated = await populatedClaim(LegacyClaim.findById(claim._id));
+      return res.status(200).json({
+        message: 'Additional verification information requested.',
+        claim: await enrichClaimWithAssignedRecords(populated),
       });
-  }
+    }
 
-  claim.adminReview = {
-    reviewedBy:
-      req.user.id,
+    if (action !== 'FORWARD') {
+      return res.status(400).json({
+        message:
+          'Invalid admin review action. Use FORWARD, REQUEST_CORRECTION, or the dedicated reject endpoint.',
+      });
+    }
 
-    reviewedAt:
-      new Date(),
+    if (!claim.deathCertificate?.publicId || !claim.identityProof?.publicId) {
+      return res.status(400).json({
+        message:
+          'Platform checks failed: death certificate and identity proof are required.',
+      });
+    }
 
-    remarks:
-      String(
-        remarks
-      ).trim(),
-  };
+    const lawyer = await User.findOne({
+      role: 'LAWYER',
+      status: 'ACTIVE',
+      'lawyerProfile.isAvailable': { $ne: false },
+    })
+      .sort({ updatedAt: 1, createdAt: 1 })
+      .select('name email');
 
-  await claim.save();
+    claim.adminReview = {
+      reviewedBy: req.user.id,
+      reviewedAt: new Date(),
+      remarks: String(remarks).trim(),
+    };
 
-  const populated =
-    await populatedClaim(
-      LegacyClaim.findById(
-        claim._id
-      )
-    );
+    if (lawyer) {
+      claim.assignedLawyerId = lawyer._id;
+      claim.status = 'UNDER_LAWYER_REVIEW';
+    } else {
+      claim.status = 'LEGACY_ACCESS_REQUESTED';
+    }
 
-  return res
-    .status(200)
-    .json({
-      message:
-  action === 'FORWARD'
-    ? 'Legacy Claim approved by Admin. The Beneficiary can now select an available Lawyer.'
-    : 'Admin review updated.',
+    await claim.save();
 
-      claim:
-        await enrichClaimWithAssignedRecords(
-          populated
-        ),
+    const appBase =
+      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+        .replace(/\/$/, '');
+
+    const claimantMessage = lawyer
+      ? 'Your legacy access claim has passed administrator verification and is now awaiting lawyer review.'
+      : 'Your legacy access claim has passed administrator verification and is awaiting lawyer assignment.';
+
+    await createNotification({
+      req,
+      recipientId: claimant._id,
+      type: 'ADMIN_REVIEW',
+      title: 'Administrator verification completed',
+      message: claimantMessage,
+      relatedEntityType: 'LegacyClaim',
+      relatedEntityId: claim._id,
+      email: claimant.email,
+      emailContent: claimStageTemplate({
+        recipientName: claimant.name,
+        subject: 'Legacy Claim Passed Admin Review – NextGen Vault',
+        message: claimantMessage,
+        appUrl: appBase + '/legacy-access',
+      }),
     });
+
+    if (lawyer) {
+      await createNotification({
+        req,
+        recipientId: lawyer._id,
+        type: 'LAWYER_REVIEW',
+        title: 'Legacy claim assigned for review',
+        message:
+          'A legacy claim for "' +
+          (allocation.assetId?.title || 'a protected legacy asset') +
+          '" has been assigned to you for legal review.',
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: lawyer.email,
+        emailContent: claimStageTemplate({
+          recipientName: lawyer.name,
+          subject: 'Legacy Claim Assigned for Lawyer Review – NextGen Vault',
+          message:
+            'A legacy access claim has passed administrator verification and has been assigned to you for legal review.',
+          appUrl: appBase + '/lawyer',
+        }),
+      });
+    }
+
+    await writeAudit(req, {
+      action: 'ADMIN_LEGACY_CLAIM_APPROVED',
+      entityType: 'LegacyClaim',
+      entityId: claim._id,
+      description: lawyer
+        ? 'Administrator approved claim and assigned an available lawyer.'
+        : 'Administrator approved claim; no available lawyer was found.',
+      metadata: {
+        allocationId: String(claim.allocationId),
+        lawyerId: lawyer?._id?.toString() || null,
+      },
+    });
+
+    const populated = await populatedClaim(LegacyClaim.findById(claim._id));
+
+    return res.status(200).json({
+      message: lawyer
+        ? 'Legacy Claim approved by Admin and assigned for Lawyer review.'
+        : 'Legacy Claim approved by Admin. No Lawyer is currently available.',
+      claim: await enrichClaimWithAssignedRecords(populated),
+    });
+  } catch (error) {
+    console.error('Admin legacy claim review error:', error);
+    return res.status(500).json({
+      message: 'Unable to complete administrator review.',
+    });
+  }
 }
 
 /*
