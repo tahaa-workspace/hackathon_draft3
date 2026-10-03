@@ -1508,6 +1508,31 @@ export async function adminReviewClaim(
       };
       await claim.save();
 
+      const appUrl =
+        (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+          .replace(/\/$/, '') + '/legacy-access';
+
+      await createNotification({
+        req,
+        recipientId: claimant._id,
+        type: 'ADMIN_REVIEW',
+        title: 'Additional verification required',
+        message:
+          String(remarks).trim() ||
+          'The administrator requested additional verification information for your legacy claim.',
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: claimant.email,
+        emailContent: claimStageTemplate({
+          recipientName: claimant.name,
+          subject: 'Additional Legacy Verification Required – NextGen Vault',
+          message:
+            String(remarks).trim() ||
+            'The administrator requested additional verification information for your legacy claim.',
+          appUrl,
+        }),
+      });
+
       await writeAudit(req, {
         action: 'ADMIN_REVIEW_REQUESTED_MORE_INFORMATION',
         entityType: 'LegacyClaim',
