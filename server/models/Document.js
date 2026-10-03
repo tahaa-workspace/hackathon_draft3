@@ -89,6 +89,36 @@ const documentSchema = new mongoose.Schema(
             type: Number,
         },
 
+        sha256: {
+            type: String,
+            default: null,
+            index: true,
+        },
+
+        verificationStatus: {
+            type: String,
+            enum: ["PENDING", "VERIFIED", "FLAGGED", "FAILED"],
+            default: "PENDING",
+            index: true,
+        },
+
+        verificationReviewedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+        },
+
+        verificationReviewedAt: {
+            type: Date,
+            default: null,
+        },
+
+        verificationRemarks: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
         encryption: {
             algorithm: {
                 type: String,
