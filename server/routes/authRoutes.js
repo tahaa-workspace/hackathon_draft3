@@ -15,6 +15,8 @@ import {
     verifyRegistrationOTP,
     requestRegistrationEmailOTP,
     verifyRegistrationEmailOTP,
+    verifyRegistrationEmailLink,
+    resendRegistrationVerification,
 } from "../controllers/registrationController.js";
 
 import {
@@ -59,6 +61,16 @@ router.post(
 router.post(
     "/registration/email/verify-otp",
     verifyRegistrationEmailOTP
+);
+
+router.post(
+    "/verify-email",
+    verifyRegistrationEmailLink
+);
+
+router.post(
+    "/resend-verification",
+    resendRegistrationVerification
 );
 
 router.post(
