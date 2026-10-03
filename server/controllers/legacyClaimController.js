@@ -1850,109 +1850,154 @@ export async function lawyerReviewClaim(
   req,
   res
 ) {
-  const {
-    action,
-    remarks = '',
-  } =
-    req.body || {};
+  try {
+    const { action, remarks = '' } = req.body || {};
 
-  const claim =
-    await LegacyClaim.findOne({
-      _id:
-        req.params.id,
-
-      assignedLawyerId:
-        req.user.id,
+    const claim = await LegacyClaim.findOne({
+      _id: req.params.id,
+      assignedLawyerId: req.user.id,
     });
 
-  if (!claim) {
-    return res
-      .status(404)
-      .json({
-        message:
-          'Assigned Legacy Access Claim not found.',
+    if (!claim) {
+      return res.status(404).json({
+        message: 'Assigned Legacy Access Claim not found.',
       });
-  }
+    }
 
-  if (
-    ![
-      'UNDER_LAWYER_REVIEW',
-      'MORE_INFORMATION_REQUIRED',
-    ].includes(
-      claim.status
-    )
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          `Claim cannot be reviewed from status ${claim.status}.`,
+    if (!['UNDER_LAWYER_REVIEW', 'MORE_INFORMATION_REQUIRED'].includes(claim.status)) {
+      return res.status(400).json({
+        message: `Claim cannot be reviewed from status ${claim.status}.`,
       });
-  }
+    }
 
-  if (
-    action ===
-    'REQUEST_MORE_INFORMATION'
-  ) {
-    claim.status =
-      'MORE_INFORMATION_REQUIRED';
-  } else if (
-    action === 'APPROVE'
-  ) {
-    claim.status =
-      'APPROVED_INFORMATION_RELEASED';
+    const claimant = await User.findById(claim.claimantId || claim.beneficiaryId)
+      .select('name email');
 
-    claim.releasedAt =
-      new Date();
-  } else if (
-    action === 'HOLD'
-  ) {
-    claim.status =
-      'ON_HOLD_DISPUTED';
-  } else {
-    return res
-      .status(400)
-      .json({
-        message:
-          'Invalid Lawyer review action.',
+    if (!claimant) {
+      return res.status(404).json({
+        message: 'Claimant account could not be found.',
       });
-  }
+    }
 
-  claim.lawyerReview = {
-    reviewedBy:
-      req.user.id,
+    const appUrl =
+      (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
+        .replace(/\/$/, '') + '/legacy-access';
 
-    reviewedAt:
-      new Date(),
+    if (action === 'REQUEST_MORE_INFORMATION') {
+      claim.status = 'MORE_INFORMATION_REQUIRED';
+      claim.lawyerReview = {
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        remarks: String(remarks).trim(),
+        action,
+      };
+      await claim.save();
 
-    remarks:
-      String(
-        remarks
-      ).trim(),
+      await createNotification({
+        req,
+        recipientId: claimant._id,
+        type: 'LAWYER_REVIEW',
+        title: 'Additional information requested',
+        message:
+          'The assigned lawyer requested additional information for your legacy access claim.',
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: claimant.email,
+        emailContent: claimStageTemplate({
+          recipientName: claimant.name,
+          subject: 'More Information Required – NextGen Vault',
+          message:
+            'The assigned lawyer requested additional information for your legacy access claim.',
+          appUrl,
+        }),
+      });
 
-    action,
-  };
+      await writeAudit(req, {
+        action: 'LAWYER_REQUESTED_MORE_INFORMATION',
+        entityType: 'LegacyClaim',
+        entityId: claim._id,
+        description: 'Assigned lawyer requested additional claim information.',
+      });
+    } else if (action === 'APPROVE') {
+      const allocation = await LegacyAllocation.findOne({
+        _id: claim.allocationId,
+        allocatedTo: claimant._id,
+        status: { $ne: 'REVOKED' },
+      });
 
-  await claim.save();
+      if (!allocation) {
+        return res.status(400).json({
+          message: 'The linked legacy allocation is no longer valid.',
+        });
+      }
 
-  const populated =
-    await populatedClaim(
-      LegacyClaim.findById(
-        claim._id
-      )
-    );
+      claim.status = 'APPROVED_INFORMATION_RELEASED';
+      claim.releasedAt = new Date();
+      claim.lawyerReview = {
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+        remarks: String(remarks).trim(),
+        action,
+      };
 
-  return res
-    .status(200)
-    .json({
+      allocation.status = 'RELEASED';
+
+      await Promise.all([
+        claim.save(),
+        allocation.save(),
+      ]);
+
+      await createNotification({
+        req,
+        recipientId: claimant._id,
+        type: 'LEGACY_UNLOCKED',
+        title: 'Legacy access approved',
+        message:
+          'Your legacy access claim has been approved. The protected document is now available in Legacy Access.',
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: claimant.email,
+        emailContent: claimStageTemplate({
+          recipientName: claimant.name,
+          subject: 'Your Legacy Access Has Been Approved – NextGen Vault',
+          message:
+            'Your legacy access claim has been approved. The protected document is now available in Legacy Access.',
+          appUrl,
+        }),
+      });
+
+      await writeAudit(req, {
+        action: 'LEGACY_ASSET_UNLOCKED',
+        entityType: 'LegacyClaim',
+        entityId: claim._id,
+        description: 'Lawyer approved claim and the linked legacy allocation was unlocked.',
+        metadata: {
+          allocationId: allocation._id.toString(),
+          claimantId: claimant._id.toString(),
+        },
+      });
+    } else {
+      return res.status(400).json({
+        message:
+          'Invalid Lawyer review action. Use APPROVE, REQUEST_MORE_INFORMATION, or the dedicated reject endpoint.',
+      });
+    }
+
+    const populated = await populatedClaim(LegacyClaim.findById(claim._id));
+
+    return res.status(200).json({
       message:
-        'Lawyer review updated.',
-
-      claim:
-        await enrichClaimWithAssignedRecords(
-          populated
-        ),
+        action === 'APPROVE'
+          ? 'Legacy access approved and document unlocked.'
+          : 'Lawyer review updated.',
+      claim: await enrichClaimWithAssignedRecords(populated),
     });
+  } catch (error) {
+    console.error('Lawyer legacy claim review error:', error);
+    return res.status(500).json({
+      message: 'Unable to complete Lawyer review.',
+    });
+  }
 }
 
 /*
