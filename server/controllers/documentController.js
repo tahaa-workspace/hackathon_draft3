@@ -561,6 +561,19 @@ export const deleteDocument = async (req, res) => {
             });
         }
 
+        const activeAllocationCount =
+            await LegacyAllocation.countDocuments({
+                assetId: document._id,
+                status: { $nin: ["REVOKED", "EXPIRED"] },
+            });
+
+        if (activeAllocationCount > 0) {
+            return res.status(409).json({
+                message:
+                    "Revoke all active legacy allocations for this document before deleting it.",
+            });
+        }
+
         /*
         =========================================
         DELETE REAL ENCRYPTED CLOUDINARY FILE
@@ -680,9 +693,6 @@ export const deleteDocument = async (req, res) => {
         return res.status(500).json({
             message:
                 "Failed to delete document.",
-
-            error:
-                error.message,
         });
     }
 };
