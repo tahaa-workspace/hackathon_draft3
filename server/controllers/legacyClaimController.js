@@ -1119,7 +1119,7 @@ export async function createLegacyClaim(
           'MORE_INFORMATION_REQUIRED',
           'UNDER_LAWYER_REVIEW',
           'APPROVED_INFORMATION_RELEASED',
-          'ON_HOLD_DISPUTED',
+          'REJECTED_PLATFORM_CLAIM',
         ],
       },
     }).lean();
@@ -1130,6 +1130,18 @@ export async function createLegacyClaim(
       .json({
         message:
           'A Legacy Access Claim already exists for this allocation.',
+        existingClaim: {
+          id:
+            existing._id.toString(),
+          allocationId:
+            existing.allocationId?.toString() || null,
+          status:
+            existing.status,
+          createdAt:
+            existing.createdAt,
+          updatedAt:
+            existing.updatedAt,
+        },
       });
   }
 
