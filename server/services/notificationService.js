@@ -22,6 +22,21 @@ export async function createNotification({
     relatedEntityId,
   });
 
+  if (req) {
+    await writeAudit(req, {
+      action: 'NOTIFICATION_CREATED',
+      entityType: 'Notification',
+      entityId: notification._id,
+      description: 'Persistent in-app notification created.',
+      metadata: {
+        type,
+        recipientId: String(recipientId),
+        relatedEntityType,
+        relatedEntityId: relatedEntityId ? String(relatedEntityId) : null,
+      },
+    });
+  }
+
   if (email && emailContent) {
     try {
       await sendTransactionalEmail({
