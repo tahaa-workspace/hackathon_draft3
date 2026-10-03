@@ -1181,6 +1181,13 @@ export const completePasswordChange =
                 otpRequest._id,
         });
 
+        await writeAudit(req, {
+            action: 'PASSWORD_CHANGED',
+            entityType: 'User',
+            entityId: user._id,
+            description: 'Authenticated user changed their password after email OTP verification.',
+        });
+
         return res.status(200).json({
 
             message:
@@ -1227,9 +1234,6 @@ export const completePasswordChange =
         return res.status(500).json({
             message:
                 "Failed to change password.",
-
-            error:
-                error.message,
         });
     }
 };
