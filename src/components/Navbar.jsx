@@ -197,6 +197,14 @@ export default function Navbar() {
               </button>
               <button
                 type="button"
+                onClick={() => navigate('/admin/legal-requests')}
+                className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-white px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 2xl:inline-flex"
+              >
+                <Briefcase size={16} />
+                Legal Requests
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate('/admin/audit-logs')}
                 className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 lg:inline-flex"
               >
