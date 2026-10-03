@@ -34,6 +34,13 @@ import {
     requireStrongRegistrationPassword,
 } from "../middleware/registrationValidationMiddleware.js";
 
+import {
+    loginRateLimit,
+    verificationRateLimit,
+    registrationRateLimit,
+    recoveryRateLimit,
+} from "../middleware/rateLimitMiddleware.js";
+
 const router = Router();
 
 /*
@@ -44,6 +51,7 @@ REGISTRATION
 
 router.post(
     "/registration/send-otp",
+    verificationRateLimit,
     requireExactRegistrationMobile,
     requestRegistrationOTP
 );
@@ -56,6 +64,7 @@ router.post(
 
 router.post(
     "/registration/email/send-otp",
+    verificationRateLimit,
     requestRegistrationEmailOTP
 );
 
@@ -71,11 +80,13 @@ router.post(
 
 router.post(
     "/resend-verification",
+    verificationRateLimit,
     resendRegistrationVerification
 );
 
 router.post(
     "/register",
+    registrationRateLimit,
     upload.single("aadhaar"),
     requireExactRegistrationMobile,
     requireStrongRegistrationPassword,
@@ -84,6 +95,7 @@ router.post(
 
 router.post(
     "/register-lawyer",
+    registrationRateLimit,
     upload.single("credential"),
     registerLawyer
 );
@@ -96,6 +108,7 @@ LOGIN
 
 router.post(
     "/login",
+    loginRateLimit,
     login
 );
 
@@ -113,6 +126,7 @@ FORGOT PASSWORD - PUBLIC RECOVERY FLOW
 
 router.post(
     "/forgot-password/request-otp",
+    recoveryRateLimit,
     requestForgotPasswordOTP
 );
 
