@@ -1119,7 +1119,6 @@ export async function createLegacyClaim(
           'MORE_INFORMATION_REQUIRED',
           'UNDER_LAWYER_REVIEW',
           'APPROVED_INFORMATION_RELEASED',
-          'REJECTED_PLATFORM_CLAIM',
         ],
       },
     }).lean();
@@ -1290,6 +1289,9 @@ export async function createLegacyClaim(
         status:
           'UNDER_ADMIN_REVIEW',
       });
+
+    allocation.status = 'CLAIMED';
+    await allocation.save();
 
     const appUrl =
       (process.env.APP_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173')
@@ -2145,10 +2147,40 @@ export async function lawyerReviewClaim(
       await createNotification({
         req,
         recipientId: claimant._id,
-        type: 'LEGACY_UNLOCKED',
-        title: 'Legacy access approved',
+        type: 'LEGACY_APPROVED',
+        title: 'Lawyer review approved',
         message:
-          'Your legacy access claim has been approved. The protected document is now available in Legacy Access.',
+          'Your legacy access claim has been approved by the assigned lawyer.',
+        relatedEntityType: 'LegacyClaim',
+        relatedEntityId: claim._id,
+        email: claimant.email,
+        emailContent: claimStageTemplate({
+          recipientName: claimant.name,
+          subject: 'Legacy Claim Approved – NextGen Vault',
+          message:
+            'Your legacy access claim has been approved by the assigned lawyer.',
+          appUrl,
+        }),
+      });
+
+      await writeAudit(req, {
+        action: 'LAWYER_LEGACY_CLAIM_APPROVED',
+        entityType: 'LegacyClaim',
+        entityId: claim._id,
+        description: 'Assigned lawyer approved the legacy access claim.',
+        metadata: {
+          allocationId: allocation._id.toString(),
+          claimantId: claimant._id.toString(),
+        },
+      });
+
+      await createNotification({
+        req,
+        recipientId: claimant._id,
+        type: 'LEGACY_UNLOCKED',
+        title: 'Legacy document unlocked',
+        message:
+          'Your protected legacy document is now available in Legacy Access.',
         relatedEntityType: 'LegacyClaim',
         relatedEntityId: claim._id,
         email: claimant.email,
@@ -2156,7 +2188,7 @@ export async function lawyerReviewClaim(
           recipientName: claimant.name,
           subject: 'Your Legacy Access Has Been Approved – NextGen Vault',
           message:
-            'Your legacy access claim has been approved. The protected document is now available in Legacy Access.',
+            'Your protected legacy document is now available in Legacy Access.',
           appUrl,
         }),
       });
