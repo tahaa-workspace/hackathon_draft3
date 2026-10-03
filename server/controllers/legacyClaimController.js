@@ -662,18 +662,63 @@ function assignedRecordPayload(doc) {
 async function enrichClaimWithAssignedRecords(
   claim
 ) {
-  const assignedDocuments =
-    await Document.find({
-      ownerId:
-        claim.ownerId?._id ||
-        claim.ownerId,
+  let assignedDocuments = [];
 
-      assignedBeneficiaries:
-        claim.beneficiaryId?._id ||
-        claim.beneficiaryId,
-    }).select(
-      'title recordType category originalName fileType fileSize'
-    );
+  if (claim.allocationId) {
+    const allocationId =
+      claim.allocationId?._id ||
+      claim.allocationId;
+
+    const allocation =
+      await LegacyAllocation.findById(
+        allocationId
+      ).populate(
+        'assetId',
+        'title recordType category originalName fileType fileSize ownerId'
+      );
+
+    if (
+      allocation?.assetId &&
+      allocation.allocatedTo?.toString() ===
+        (
+          claim.claimantId?._id ||
+          claim.claimantId ||
+          claim.beneficiaryId?._id ||
+          claim.beneficiaryId
+        )?.toString()
+    ) {
+      assignedDocuments = [
+        allocation.assetId,
+      ];
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | LEGACY DATA FALLBACK
+  |--------------------------------------------------------------------------
+  |
+  | Older demo claims may pre-date LegacyAllocation. Keep them readable during
+  | migration, but all new claims are allocation-specific.
+  |
+  */
+  if (
+    assignedDocuments.length === 0 &&
+    !claim.allocationId
+  ) {
+    assignedDocuments =
+      await Document.find({
+        ownerId:
+          claim.ownerId?._id ||
+          claim.ownerId,
+
+        assignedBeneficiaries:
+          claim.beneficiaryId?._id ||
+          claim.beneficiaryId,
+      }).select(
+        'title recordType category originalName fileType fileSize'
+      );
+  }
 
   const assignedRecords =
     assignedDocuments.map(
