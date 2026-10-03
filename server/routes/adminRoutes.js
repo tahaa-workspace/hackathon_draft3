@@ -16,7 +16,7 @@ import {
 } from '../controllers/lawyerCredentialReviewController.js';
 import protect from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
-import cleanupOwnerAadhaarPlaceholderOnReject from '../middleware/aadhaarPlaceholderCleanupMiddleware.js';
+import cleanupUserAadhaarPlaceholderOnReject from '../middleware/aadhaarPlaceholderCleanupMiddleware.js';
 
 const router = Router();
 
