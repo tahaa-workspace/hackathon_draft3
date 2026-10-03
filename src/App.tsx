@@ -17,6 +17,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Register from './pages/Register';
 import LawyerRegister from './pages/LawyerRegister';
 import PendingApproval from './pages/PendingApproval';
+import VerifyEmail from './pages/VerifyEmail';
 import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLegacyClaims from './pages/AdminLegacyClaims';
@@ -143,6 +144,15 @@ export default function App() {
           />
 
           <Route path="/pending-approval" element={<PendingApproval />} />
+
+          <Route
+            path="/verify-email"
+            element={
+              <PublicOnlyRoute>
+                <VerifyEmail />
+              </PublicOnlyRoute>
+            }
+          />
 
           <Route
             path="/change-password"
