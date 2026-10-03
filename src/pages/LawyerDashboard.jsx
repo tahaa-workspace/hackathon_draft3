@@ -1106,14 +1106,14 @@ export default function LawyerDashboard() {
                           <h2 className="font-semibold text-ink-900">
 
                             {
-                              claim.claimant
+                              claim.beneficiary
                                 ?.name
                             }
 
                             {' → '}
 
                             {
-                              claim.allocator
+                              claim.owner
                                 ?.name
                             }
 
@@ -1160,11 +1160,11 @@ export default function LawyerDashboard() {
 
                             <dd className="font-medium text-ink-700">
 
-                              {claim.allocator?.name}
+                              {claim.owner?.name}
 
                               <br />
 
-                              {claim.allocator?.email}
+                              {claim.owner?.email}
 
                             </dd>
 
@@ -1180,14 +1180,14 @@ export default function LawyerDashboard() {
                             <dd className="font-medium text-ink-700">
 
                               {
-                                claim.claimant
+                                claim.beneficiary
                                   ?.name
                               }
 
                               <br />
 
                               {
-                                claim.claimant
+                                claim.beneficiary
                                   ?.email
                               }
 
