@@ -7,6 +7,7 @@ import {
   getClaimInformationRequests,
   getAdditionalClaimFile,
   rejectClaim,
+  requestClaimInformation,
   reviewClaimAsAdmin,
 } from '../services/legacyService';
 
