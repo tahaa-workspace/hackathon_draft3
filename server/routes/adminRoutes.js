@@ -6,6 +6,9 @@ import {
   getAadhaarReviewUrl,
   approveUser,
   rejectUser,
+  listAdminDocuments,
+  reviewDocumentVerification,
+  listAdminLegacyAllocations,
 } from '../controllers/adminController.js';
 import {
   getLawyerCredentialReviewUrl,
@@ -19,6 +22,9 @@ const router = Router();
 
 router.get('/registrations', protect, authorize('ADMIN'), listPendingRegistrations);
 router.get('/users', protect, authorize('ADMIN'), listUsers);
+router.get('/documents', protect, authorize('ADMIN'), listAdminDocuments);
+router.patch('/documents/:id/verification', protect, authorize('ADMIN'), reviewDocumentVerification);
+router.get('/legacy-allocations', protect, authorize('ADMIN'), listAdminLegacyAllocations);
 router.put('/users/:id/status', protect, authorize('ADMIN'), updateUserStatus);
 router.get('/users/:id/aadhaar', protect, authorize('ADMIN'), getAadhaarReviewUrl);
 router.get(
