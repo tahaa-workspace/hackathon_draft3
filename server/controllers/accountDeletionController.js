@@ -74,12 +74,20 @@ export async function deleteOwnAccount(req, res) {
       error
     );
 
+    if (error.status && error.status < 500) {
+      return res
+        .status(error.status)
+        .json({
+          message:
+            error.message,
+        });
+    }
+
     return res
-      .status(error.status || 500)
+      .status(500)
       .json({
         message:
-          error.message ||
-          'Unable to delete the account.',
+          'Unable to delete the account right now.',
       });
   }
 }
