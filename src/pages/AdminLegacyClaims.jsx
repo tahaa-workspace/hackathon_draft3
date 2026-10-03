@@ -143,6 +143,36 @@ const reject = async (claim) => {
   }
 };
 
+  const requestInfo = async (claim) => {
+    const message =
+      window.prompt(
+        'Describe the additional verification information or document required.',
+        ''
+      ) ?? null;
+
+    if (message === null) return;
+
+    if (!message.trim()) {
+      setError('Describe what additional information is required.');
+      return;
+    }
+
+    setWorkingId(claim.id);
+    setError('');
+
+    try {
+      await requestClaimInformation(claim.id, message.trim());
+      await load();
+    } catch (err) {
+      setError(
+        err.message ||
+        'Unable to request additional verification information.'
+      );
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
   const forward = async (claim) => {
     const remarks = window.prompt('Platform review remarks.', 'Platform checks completed.') ?? null;
     if (remarks === null) return;
@@ -173,6 +203,22 @@ const reject = async (claim) => {
             <div className="border-t border-ink-100 bg-ink-50/30 px-5 py-5"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-ink-800">Allocated Vault records</h3><p className="mt-1 text-xs text-ink-400">Only these pre-assigned records can be released after verification.</p></div><span className="badge bg-brand-50 text-brand-700">{summary.total} total</span></div><div className="mt-4 grid gap-3 sm:grid-cols-4"><SummaryCard Icon={Landmark} label="Assets" value={summary.assets} /><SummaryCard Icon={CreditCard} label="Liabilities" value={summary.liabilities} /><SummaryCard Icon={FolderOpen} label="General" value={summary.general} /><SummaryCard Icon={FileText} label="Total" value={summary.total} /></div>{records.length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{records.map((record) => <div key={record.id} className="rounded-xl border border-ink-100 bg-white px-3 py-3"><div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-semibold text-ink-800">{record.title}</p><span className="text-[10px] font-semibold text-brand-700">{record.recordType || 'GENERAL'}</span></div><p className="mt-1 text-xs text-ink-400">{record.category}</p></div>)}</div>}</div>
             {claim.status === 'UNDER_ADMIN_REVIEW' && (
   <div className="flex flex-wrap justify-end gap-2 border-t border-ink-100 bg-white px-5 py-4">
+
+    <button
+      disabled={
+        workingId === claim.id
+      }
+      onClick={() =>
+        requestInfo(claim)
+      }
+      className="btn-secondary"
+    >
+      <MessageSquareMore
+        size={14}
+      />
+
+      Request More Information
+    </button>
 
     <button
       disabled={
