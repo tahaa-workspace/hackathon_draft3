@@ -306,6 +306,19 @@ export async function getMyLegalConsultations() {
   return data.requests || [];
 }
 
+export async function getAdminLegalConsultations(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== '' && value != null)
+  );
+
+  const data = await request(
+    '/legal-requests/admin' +
+      (query.toString() ? '?' + query.toString() : '')
+  );
+
+  return data;
+}
+
 export async function getLawyerConsultations() {
   const data = await request('/legal-requests/lawyer');
   return data.requests || [];
