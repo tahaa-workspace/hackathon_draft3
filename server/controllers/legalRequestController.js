@@ -138,6 +138,62 @@ export async function listMyLegalRequests(req, res) {
   return res.status(200).json({ requests: requests.map(payload) });
 }
 
+export async function listAdminLegalRequests(req, res) {
+  const {
+    status,
+    lawyerId,
+    requesterId,
+    page = '1',
+    limit = '50',
+  } = req.query;
+
+  const filter = {};
+
+  if (status) filter.status = status;
+  if (lawyerId) filter.lawyerId = lawyerId;
+  if (requesterId) filter.requesterId = requesterId;
+
+  const safePage =
+    Math.max(
+      1,
+      Number(page) || 1
+    );
+
+  const safeLimit =
+    Math.min(
+      100,
+      Math.max(
+        1,
+        Number(limit) || 50
+      )
+    );
+
+  const skip =
+    (safePage - 1) *
+    safeLimit;
+
+  const [requests, total] =
+    await Promise.all([
+      populate(
+        LegalRequest.find(filter)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(safeLimit)
+      ),
+      LegalRequest.countDocuments(filter),
+    ]);
+
+  return res.status(200).json({
+    page:
+      safePage,
+    limit:
+      safeLimit,
+    total,
+    requests:
+      requests.map(payload),
+  });
+}
+
 export async function listLawyerLegalRequests(req, res) {
   const requests = await populate(
     LegalRequest.find({ lawyerId: req.user.id }).sort({ createdAt: -1 })
