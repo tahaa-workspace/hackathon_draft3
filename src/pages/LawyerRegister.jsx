@@ -320,9 +320,9 @@ export default function LawyerRegister() {
 
         <div className="mt-6 border-t border-ink-100 pt-5 text-center text-sm text-ink-500">
           <p>
-            Creating a normal user account instead?{' '}
+            Registering as an Owner instead?{' '}
             <Link to="/register" className="font-semibold text-brand-700 hover:text-brand-800">
-              Create User account
+              Create Owner account
             </Link>
           </p>
           <p className="mt-2">
