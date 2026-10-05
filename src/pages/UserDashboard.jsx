@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Archive,
-  Bell,
   Download,
   Eye,
   FilePlus2,
@@ -20,9 +19,6 @@ import {
   createLegacyAllocation,
   deleteDocument,
   downloadDocument,
-  getIncomingAllocations,
-  getMyLegacyClaims,
-  getNotifications,
   getOutgoingAllocations,
   revokeLegacyAllocation,
   searchAllocationUsers,
@@ -64,9 +60,6 @@ async function uploadDocument(form) {
 export default function UserDashboard() {
   const [documents, setDocuments] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
-  const [incoming, setIncoming] = useState([]);
-  const [claims, setClaims] = useState([]);
-  const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -89,19 +82,12 @@ export default function UserDashboard() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [docs, allocations, incomingAllocations, myClaims, notifications] =
-        await Promise.all([
-          loadDocuments(),
-          getOutgoingAllocations(),
-          getIncomingAllocations(),
-          getMyLegacyClaims(),
-          getNotifications(),
-        ]);
+      const [docs, allocations] = await Promise.all([
+        loadDocuments(),
+        getOutgoingAllocations(),
+      ]);
       setDocuments(docs);
       setOutgoing(allocations);
-      setIncoming(incomingAllocations);
-      setClaims(myClaims);
-      setRecentActivity(notifications.slice(0, 5));
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -272,54 +258,6 @@ export default function UserDashboard() {
             {message}
           </div>
         )}
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ['My Assets', documents.length, 'Encrypted records you own'],
-            ['Outgoing Allocations', outgoing.filter((item) => item.status !== 'REVOKED').length, 'Active legacy designations'],
-            ['Legacy Access', incoming.length, 'Allocations received from other users'],
-            ['Active Claims', claims.filter((claim) => !['APPROVED_INFORMATION_RELEASED', 'REJECTED_PLATFORM_CLAIM'].includes(claim.status)).length, 'Claims still moving through review'],
-          ].map(([label, value, helper]) => (
-            <article key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-indigo-700">
-                <Bell size={16} />
-                <h2 className="text-lg font-semibold text-slate-900">Recent activity</h2>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">Latest persistent notifications from your account.</p>
-            </div>
-            <Link to="/notifications" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
-              View all
-            </Link>
-          </div>
-
-          {recentActivity.length === 0 ? (
-            <p className="mt-5 text-sm text-slate-400">No recent activity yet.</p>
-          ) : (
-            <div className="mt-4 divide-y divide-slate-100">
-              {recentActivity.map((item) => (
-                <div key={item.id} className="py-3 first:pt-0 last:pb-0">
-                  <div className="flex items-start gap-3">
-                    <span className={"mt-1.5 h-2 w-2 rounded-full " + (!item.isRead ? "bg-indigo-600" : "bg-slate-300")} />
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{item.message}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
 
         <section className="grid gap-6 lg:grid-cols-2">
           <form onSubmit={handleUpload} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
