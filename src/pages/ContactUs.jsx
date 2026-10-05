@@ -32,7 +32,7 @@ import "../styles/contact.css";
 const CATEGORIES = [
   { value: "GENERAL", label: "General Enquiry" },
   { value: "ACCOUNT_SUPPORT", label: "Account Support" },
-  { value: "BENEFICIARY_SUPPORT", label: "Legacy Access Support" },
+  { value: "BENEFICIARY_SUPPORT", label: "Beneficiary Support" },
   { value: "LEGACY_CLAIM_SUPPORT", label: "Legacy Claim Support" },
   { value: "LEGAL_ADVISOR", label: "Legal Advisor Enquiry" },
   { value: "TECHNICAL", label: "Technical Issue" },
@@ -46,8 +46,8 @@ const SUPPORT_AREAS = [
   },
   {
     icon: FileHeart,
-    title: "Legacy Access & Claims",
-    text: "Help with legacy allocations, access claims and additional information requests.",
+    title: "Beneficiary & Legacy Claims",
+    text: "Help with beneficiary access, claim submissions and additional information requests.",
   },
   {
     icon: Gavel,
@@ -64,7 +64,7 @@ const SUPPORT_AREAS = [
 const FAQS = [
   {
     q: "Can I use this form for an urgent legacy claim?",
-    a: "Use the Legacy Access workflow inside your user account for formal claim submissions. This contact form is for support and enquiries.",
+    a: "Use the Legacy Claim workflow inside the Beneficiary dashboard for formal claim submissions. This contact form is for support and enquiries.",
   },
   {
     q: "Should I attach Aadhaar or other sensitive documents here?",
@@ -210,7 +210,7 @@ export default function ContactUs() {
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-base leading-8 text-ink-500 sm:text-lg">
-                  Whether you have a question about your account, legacy access,
+                  Whether you have a question about your account, beneficiary access,
                   a legacy claim or a technical issue, send us a message and our team can review it.
                 </p>
               </motion.div>
