@@ -16,12 +16,7 @@ async function migrate() {
   if (legacyUsers.length > 0) {
     await User.collection.updateMany(
       { role: { $in: ['OWNER', 'BENEFICIARY'] } },
-      {
-        $set: {
-          role: 'USER',
-          emailVerified: true,
-        },
-      }
+      { $set: { role: 'USER' } }
     );
   }
 
@@ -128,6 +123,10 @@ async function migrate() {
 
   const legacyReleaseAllocations =
     await LegacyAllocation.find({
+      releaseCondition: {
+        $ne:
+          'LEGACY_CLAIM',
+      },
       status: {
         $nin: [
           'REVOKED',
@@ -149,24 +148,6 @@ async function migrate() {
           'APPROVED_INFORMATION_RELEASED',
       });
 
-    const activeClaim =
-      approvedClaim
-        ? null
-        : await LegacyClaim.exists({
-            allocationId:
-              allocation._id,
-            claimantId:
-              allocation.allocatedTo,
-            status: {
-              $in: [
-                'LEGACY_ACCESS_REQUESTED',
-                'UNDER_ADMIN_REVIEW',
-                'MORE_INFORMATION_REQUIRED',
-                'UNDER_LAWYER_REVIEW',
-              ],
-            },
-          });
-
     allocation.releaseCondition =
       'LEGACY_CLAIM';
 
@@ -176,9 +157,7 @@ async function migrate() {
     allocation.status =
       approvedClaim
         ? 'RELEASED'
-        : activeClaim
-          ? 'CLAIMED'
-          : 'ACTIVE';
+        : 'ACTIVE';
 
     await allocation.save();
 
