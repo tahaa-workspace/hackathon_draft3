@@ -43,7 +43,7 @@ router.put(
   '/users/:id/reject',
   protect,
   authorize('ADMIN'),
-  cleanupUserAadhaarPlaceholderOnReject,
+  cleanupOwnerAadhaarPlaceholderOnReject,
   rejectUser
 );
 
