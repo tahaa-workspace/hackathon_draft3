@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 
 import Navbar from '../components/Navbar';
@@ -10,15 +9,6 @@ import {
 } from '../services/legacyService';
 
 export default function Notifications() {
-  const navigate = useNavigate();
-  const storedUser = (() => {
-    try {
-      return JSON.parse(sessionStorage.getItem('dl_user') || 'null');
-    } catch {
-      return null;
-    }
-  })();
-
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -38,61 +28,13 @@ export default function Notifications() {
     refresh();
   }, [refresh]);
 
-  const navigateForNotification = (item) => {
-    const legacyTypes = new Set([
-      'LEGACY_ALLOCATION',
-      'LEGACY_CLAIM',
-      'ADMIN_REVIEW',
-      'LAWYER_REVIEW',
-      'LEGACY_APPROVED',
-      'LEGACY_REJECTED',
-      'LEGACY_UNLOCKED',
-      'LEGACY_RELEASE',
-    ]);
-
-    if (legacyTypes.has(item.type)) {
-      if (storedUser?.role === 'ADMIN') {
-        navigate('/admin/legacy-claims');
-      } else if (storedUser?.role === 'LAWYER') {
-        navigate('/lawyer');
-      } else {
-        navigate('/legacy-access');
-      }
-      return;
-    }
-
-    if (item.type === 'LEGAL_REQUEST') {
-      navigate(
-        storedUser?.role === 'LAWYER'
-          ? '/lawyer/consultations'
-          : storedUser?.role === 'ADMIN'
-            ? '/admin/legal-requests'
-            : '/legal-assistance'
-      );
-      return;
-    }
-
-    if (item.type === 'DOCUMENT_VERIFICATION' && storedUser?.role === 'ADMIN') {
-      navigate('/admin/records');
-      return;
-    }
-
-    navigate('/notifications');
-  };
-
-  const openNotification = async (item) => {
+  const markOne = async (id) => {
     try {
-      if (!item.isRead) {
-        await markNotificationRead(item.id);
-        setItems((current) =>
-          current.map((entry) =>
-            entry.id === item.id ? { ...entry, isRead: true } : entry
-          )
-        );
-        window.dispatchEvent(new Event('nextgen:notifications-changed'));
-      }
-
-      navigateForNotification(item);
+      await markNotificationRead(id);
+      setItems((current) =>
+        current.map((item) => item.id === id ? { ...item, isRead: true } : item)
+      );
+      window.dispatchEvent(new Event('nextgen:notifications-changed'));
     } catch (error) {
       setMessage(error.message);
     }
@@ -147,7 +89,7 @@ export default function Notifications() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => openNotification(item)}
+                  onClick={() => !item.isRead && markOne(item.id)}
                   className={"w-full px-5 py-5 text-left transition hover:bg-slate-50 " + (!item.isRead ? "bg-indigo-50/40" : "")}
                 >
                   <div className="flex items-start gap-3">
