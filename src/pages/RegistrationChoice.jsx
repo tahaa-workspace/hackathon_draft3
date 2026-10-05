@@ -10,7 +10,7 @@ export default function RegistrationChoice() {
     <AuthShell
       variant="wide"
       title="Create your account"
-      subtitle="Create a normal user account or apply for a lawyer account"
+      subtitle="Choose how you want to join Next Gen Vault"
       footer={
         <p className="text-sm text-ink-500">
           Already have an account?{' '}
@@ -26,7 +26,7 @@ export default function RegistrationChoice() {
       <div className="space-y-4">
         <button
           type="button"
-          onClick={() => navigate('/register')}
+          onClick={() => navigate('/register-owner')}
           className="w-full rounded-2xl border border-ink-100 bg-white p-5 text-left shadow-sm transition hover:border-brand-200 hover:shadow-md"
         >
           <div className="flex items-start gap-4">
@@ -35,17 +35,17 @@ export default function RegistrationChoice() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold text-ink-900">Create User Account</h2>
+                <h2 className="text-base font-semibold text-ink-900">Register as Owner</h2>
                 <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-700">
-                  User account
+                  Vault account
                 </span>
               </div>
               <p className="mt-2 text-sm leading-6 text-ink-500">
-                Use one account to own documents, allocate selected records to others, and receive legacy allocations from multiple users.
+                Create your digital vault, upload records, add beneficiaries and control what can be released later.
               </p>
               <div className="mt-3 flex items-center gap-2 text-xs font-medium text-ink-500">
                 <ShieldCheck size={15} className="text-emerald-600" />
-                Email verification and administrator identity review required
+                Email, mobile and Aadhaar verification required
               </div>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function RegistrationChoice() {
         </button>
 
         <div className="rounded-xl border border-ink-100 bg-ink-50/70 px-4 py-3 text-xs leading-5 text-ink-500">
-          Normal users do not register as Owner or Beneficiary. Ownership and recipient access are determined by document and legacy-allocation relationships. Administrator accounts are system-managed.
+          Beneficiary accounts are created through an Owner relationship. Administrator accounts are system-managed and are not publicly registered.
         </div>
       </div>
     </AuthShell>
