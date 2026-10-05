@@ -160,7 +160,7 @@ export default function AuthBrandPanel() {
               <VaultItem
                 icon={KeyRound}
                 title="Private Information"
-                access="Private"
+                access="Owner only"
               />
 
             </div>
