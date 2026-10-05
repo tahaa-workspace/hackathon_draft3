@@ -33,18 +33,18 @@ const OFFERINGS = [
   },
   {
     icon: UserRoundCheck,
-    title: "Trusted Legacy Recipients",
-    text: "Allocate selected records to trusted existing users while keeping each user on a single verified account.",
+    title: "Verified Beneficiaries",
+    text: "Create trusted beneficiary accounts with identity documentation and decide who can receive access to selected records.",
   },
   {
     icon: KeyRound,
     title: "Document-Level Permissions",
-    text: "Access is allocated record by record, ensuring that each recipient only receives the information intended for them.",
+    text: "Access is assigned record by record, ensuring that a beneficiary only receives the information intended for them.",
   },
   {
     icon: ShieldCheck,
     title: "Identity & Role Security",
-    text: "User verification, authentication, resource ownership checks and role-based authorization help protect sensitive workflows.",
+    text: "Owner verification, beneficiary identity records, authentication and role-based authorization help protect sensitive workflows.",
   },
   {
     icon: Files,
@@ -54,7 +54,7 @@ const OFFERINGS = [
   {
     icon: Network,
     title: "Controlled Legacy Claims",
-    text: "Recipients, administrators and legal advisors follow a structured claim, review and additional-information workflow before information is released.",
+    text: "Beneficiaries, administrators and legal advisors follow a structured claim, review and additional-information workflow before information is released.",
   },
 ];
 
@@ -151,7 +151,7 @@ export default function AboutUs() {
 
                 <p className="mt-6 max-w-xl text-base leading-8 text-ink-500 sm:text-lg">
                   NextGen Vault helps individuals securely organize important
-                  documents, manage trusted recipients and control how
+                  documents, manage trusted beneficiaries and control how
                   sensitive digital information is handed over when it matters.
                 </p>
 
@@ -231,8 +231,8 @@ export default function AboutUs() {
               </h2>
 
               <p>
-                Our mission is to provide a secure environment where users can
-                organize important records, establish trusted recipient
+                Our mission is to provide a secure environment where owners can
+                organize important records, establish verified beneficiary
                 relationships and define controlled access, while administrators
                 and legal advisors support structured legacy claim reviews when
                 those records need to be handed over.
@@ -263,7 +263,7 @@ export default function AboutUs() {
 
                 <p>
                   The platform combines secure organization,
-                  legacy allocation management and controlled access
+                  beneficiary management and controlled access
                   instead of treating legacy planning as simple
                   cloud storage.
                 </p>
