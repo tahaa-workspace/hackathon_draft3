@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import streamifier from 'streamifier';
 import cloudinary from '../config/cloudinary.js';
 import LegacyClaim from '../models/LegacyClaim.js';
-import LegacyAllocation from '../models/LegacyAllocation.js';
 import User from '../models/User.js';
 import { createNotification } from '../services/notificationService.js';
 import { claimStageTemplate } from '../services/emailTemplates.js';
@@ -154,7 +153,7 @@ function canReadClaim(claim, user) {
 export async function getClaimInformationRequests(req, res) {
   try {
     const claim = await LegacyClaim.findById(req.params.id).select(
-      'claimantId beneficiaryId assignedLawyerId informationRequests'
+      'beneficiaryId assignedLawyerId informationRequests'
     );
     if (!claim) return res.status(404).json({ message: 'Legacy Access Claim not found.' });
     if (!canReadClaim(claim, req.user)) {
@@ -574,20 +573,6 @@ export async function rejectLegacyClaim(
     claim.status = 'REJECTED_PLATFORM_CLAIM';
     await claim.save();
 
-    if (claim.allocationId) {
-      await LegacyAllocation.findOneAndUpdate(
-        {
-          _id: claim.allocationId,
-          allocatedTo: claim.claimantId || claim.beneficiaryId,
-          status: { $nin: ['REVOKED', 'EXPIRED'] },
-        },
-        {
-          $set: {
-            status: 'ACTIVE',
-          },
-        }
-      );
-    }
 
     const claimant = await User.findById(claim.claimantId || claim.beneficiaryId)
       .select('name email');
