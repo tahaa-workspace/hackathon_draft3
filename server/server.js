@@ -12,7 +12,6 @@ import legacyAllocationRoutes from './routes/legacyAllocationRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import auditRoutes from './routes/auditRoutes.js';
 import legalRequestRoutes from './routes/legalRequestRoutes.js';
-import { verifyMailer } from './config/mailer.js';
 
 const app = express();
 
@@ -89,17 +88,6 @@ connectDB(process.env.MONGO_URI)
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Digital Legacy API running on port ${PORT}`);
-
-      verifyMailer()
-        .then(() => {
-          console.log('SMTP transporter verified and ready.');
-        })
-        .catch((mailError) => {
-          console.warn(
-            'SMTP verification warning:',
-            mailError.message
-          );
-        });
     });
   })
   .catch((err) => {
