@@ -14,33 +14,15 @@ import Navbar from '../components/Navbar';
 import SecureDocumentViewer from '../components/SecureDocumentViewer';
 import {
   downloadDocument,
-  getClaimInformationRequests,
   getIncomingAllocations,
   getLawyersForSelection,
   getMyLegacyClaims,
   selectClaimLawyer,
-  submitAdditionalClaimInformation,
   submitLegacyClaim,
 } from '../services/legacyService';
 
 function claimForAllocation(claims, allocationId) {
-  return (
-    claims.find(
-      (claim) =>
-        claim.allocationId === allocationId &&
-        claim.status !== 'REJECTED_PLATFORM_CLAIM'
-    ) || null
-  );
-}
-
-function latestRejectedClaimForAllocation(claims, allocationId) {
-  return (
-    claims.find(
-      (claim) =>
-        claim.allocationId === allocationId &&
-        claim.status === 'REJECTED_PLATFORM_CLAIM'
-    ) || null
-  );
+  return claims.find((claim) => claim.allocationId === allocationId) || null;
 }
 
 function claimProgress(status) {
@@ -78,9 +60,6 @@ export default function LegacyAccess() {
   const [selectedLawyerByClaim, setSelectedLawyerByClaim] = useState({});
   const [lawyerLoadingId, setLawyerLoadingId] = useState(null);
   const [previewDocument, setPreviewDocument] = useState(null);
-  const [additionalFilesByClaim, setAdditionalFilesByClaim] = useState({});
-  const [additionalResponseByClaim, setAdditionalResponseByClaim] = useState({});
-  const [additionalSubmittingId, setAdditionalSubmittingId] = useState(null);
 
   const [form, setForm] = useState({
     identityProofType: 'AADHAAR',
@@ -97,22 +76,8 @@ export default function LegacyAccess() {
         getIncomingAllocations(),
         getMyLegacyClaims(),
       ]);
-      const enrichedClaims = await Promise.all(
-        myClaims.map(async (claim) => {
-          if (claim.status !== 'MORE_INFORMATION_REQUIRED') {
-            return claim;
-          }
-
-          return {
-            ...claim,
-            informationRequests:
-              await getClaimInformationRequests(claim.id).catch(() => []),
-          };
-        })
-      );
-
       setAllocations(incoming);
-      setClaims(enrichedClaims);
+      setClaims(myClaims);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -183,45 +148,6 @@ export default function LegacyAccess() {
       setMessage(error.message || 'Unable to select lawyer.');
     } finally {
       setLawyerLoadingId(null);
-    }
-  };
-
-  const submitAdditionalEvidence = async (claim) => {
-    const files = additionalFilesByClaim[claim.id] || [];
-
-    if (files.length === 0) {
-      setMessage('Upload at least one requested supporting document.');
-      return;
-    }
-
-    setAdditionalSubmittingId(claim.id);
-    setMessage('');
-
-    try {
-      await submitAdditionalClaimInformation(claim.id, {
-        files,
-        responseMessage: additionalResponseByClaim[claim.id] || '',
-      });
-
-      setAdditionalFilesByClaim((current) => ({
-        ...current,
-        [claim.id]: [],
-      }));
-      setAdditionalResponseByClaim((current) => ({
-        ...current,
-        [claim.id]: '',
-      }));
-
-      setMessage('Additional evidence submitted. Your claim has returned to review.');
-      await refresh();
-      window.dispatchEvent(new Event('nextgen:notifications-changed'));
-    } catch (error) {
-      setMessage(
-        error.message ||
-        'Unable to submit the requested additional information.'
-      );
-    } finally {
-      setAdditionalSubmittingId(null);
     }
   };
 
@@ -310,8 +236,6 @@ export default function LegacyAccess() {
           <div className="space-y-4">
             {allocations.map((allocation) => {
               const claim = claimForAllocation(claims, allocation.id);
-              const rejectedClaim =
-                latestRejectedClaimForAllocation(claims, allocation.id);
               const claimApproved =
                 claim?.status === 'APPROVED_INFORMATION_RELEASED';
               const canOpen =
@@ -351,12 +275,6 @@ export default function LegacyAccess() {
                           </>
                         )}
                       </div>
-
-                      {!claim && rejectedClaim && (
-                        <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-3 py-3 text-xs text-red-700">
-                          The previous claim was rejected. You may submit a new claim for this allocation with corrected or additional evidence.
-                        </div>
-                      )}
 
                       {claim && (() => {
                         const progress = claimProgress(claim.status);
@@ -413,84 +331,6 @@ export default function LegacyAccess() {
                           )}
                         </>
                       )}
-
-                      {claim?.status === 'MORE_INFORMATION_REQUIRED' && (() => {
-                        const pendingRequest =
-                          [...(claim.informationRequests || [])]
-                            .reverse()
-                            .find((item) => item.status === 'PENDING');
-
-                        return (
-                          <div className="w-full rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
-                            <p className="text-sm font-semibold text-orange-900">
-                              Additional verification information required
-                            </p>
-                            <p className="mt-1 text-xs leading-5 text-orange-800">
-                              {pendingRequest?.message ||
-                                'The reviewer requested additional evidence for this claim.'}
-                            </p>
-
-                            <div className="mt-3 grid gap-3">
-                              <label className="text-xs font-semibold text-slate-700">
-                                Response message
-                                <textarea
-                                  className="field-input mt-1 min-h-20"
-                                  value={additionalResponseByClaim[claim.id] || ''}
-                                  onChange={(event) =>
-                                    setAdditionalResponseByClaim((current) => ({
-                                      ...current,
-                                      [claim.id]: event.target.value,
-                                    }))
-                                  }
-                                  placeholder="Explain the additional evidence you are providing."
-                                />
-                              </label>
-
-                              <label className="cursor-pointer rounded-xl border border-dashed border-orange-200 bg-white p-3">
-                                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                                  <Upload size={15} />
-                                  Additional evidence (up to 5 files)
-                                </span>
-                                <input
-                                  type="file"
-                                  multiple
-                                  accept="application/pdf,image/jpeg,image/png"
-                                  className="mt-2 block w-full text-xs text-slate-500"
-                                  onChange={(event) =>
-                                    setAdditionalFilesByClaim((current) => ({
-                                      ...current,
-                                      [claim.id]:
-                                        Array.from(event.target.files || []).slice(0, 5),
-                                    }))
-                                  }
-                                />
-                              </label>
-
-                              {(additionalFilesByClaim[claim.id] || []).length > 0 && (
-                                <p className="text-xs text-slate-500">
-                                  {(additionalFilesByClaim[claim.id] || []).length} file(s) selected.
-                                </p>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => submitAdditionalEvidence(claim)}
-                                disabled={additionalSubmittingId === claim.id}
-                                className="btn-primary w-fit"
-                              >
-                                {additionalSubmittingId === claim.id ? (
-                                  <Loader2 size={16} className="animate-spin" />
-                                ) : (
-                                  <Upload size={16} />
-                                )}
-                                {additionalSubmittingId === claim.id
-                                  ? 'Submitting…'
-                                  : 'Submit additional evidence'}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()}
 
                       {claim?.status === 'LEGACY_ACCESS_REQUESTED' && (
                         <div className="w-full rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
