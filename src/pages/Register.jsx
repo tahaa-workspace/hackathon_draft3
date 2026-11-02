@@ -29,33 +29,6 @@ const INITIAL = {
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 
-const PASSWORD_RULES = [
-  {
-    key: 'length',
-    label: 'Minimum 8 characters',
-    test: (value) => value.length >= 8,
-  },
-  {
-    key: 'uppercase',
-    label: 'At least one uppercase letter',
-    test: (value) => /[A-Z]/.test(value),
-  },
-  {
-    key: 'number',
-    label: 'At least one number',
-    test: (value) => /\d/.test(value),
-  },
-  {
-    key: 'special',
-    label: 'At least one special character',
-    test: (value) => /[^A-Za-z0-9]/.test(value),
-  },
-];
-
-const isValidIndianMobile = (value) => /^\d{10}$/.test(value);
-const isStrongPassword = (value) =>
-  PASSWORD_RULES.every((rule) => rule.test(value));
-
 export default function Register() {
   const navigate = useNavigate();
 
@@ -71,11 +44,7 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const update = (key) => (event) => {
-    let value = event.target.value;
-
-    if (key === 'phone') {
-      value = value.replace(/\D/g, '').slice(0, 10);
-    }
+    const value = event.target.value;
 
     setForm((current) => ({
       ...current,
@@ -124,20 +93,33 @@ export default function Register() {
     setError('');
     setMessage('');
 
+    if (!form.name.trim()) {
+      setError('Full name is required.');
+      return;
+    }
+
+    if (!form.username.trim()) {
+      setError('Username is required.');
+      return;
+    }
+
     if (!form.email.trim()) {
       setError('Email address is required.');
       return;
     }
 
-    if (!isValidIndianMobile(form.phone)) {
-      setError('Mobile number must contain exactly 10 digits.');
+    if (!form.phone.trim()) {
+      setError('Mobile number is required.');
       return;
     }
 
-    if (!isStrongPassword(form.password)) {
-      setError(
-        'Password must be at least 8 characters and include an uppercase letter, a number, and a special character.'
-      );
+    if (!form.password) {
+      setError('Password is required.');
+      return;
+    }
+
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
 
@@ -317,18 +299,15 @@ export default function Register() {
             <input
               id="phone"
               type="tel"
-              inputMode="numeric"
               className="field-input"
               value={form.phone}
               onChange={update('phone')}
-              placeholder="10-digit mobile number"
+              placeholder="Mobile number"
               autoComplete="tel"
-              minLength={10}
-              maxLength={10}
               required
             />
             <p className="mt-1 text-xs text-ink-400">
-              Stored for account contact. This build does not claim SMS verification without a configured SMS provider.
+              Stored for account contact.
             </p>
           </div>
         </div>
@@ -408,23 +387,6 @@ export default function Register() {
                 {showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-ink-50 p-3">
-          <p className="text-xs font-semibold text-ink-700">Password requirements</p>
-          <div className="mt-2 grid gap-1 sm:grid-cols-2">
-            {PASSWORD_RULES.map((rule) => (
-              <p
-                key={rule.key}
-                className={
-                  'text-xs ' +
-                  (rule.test(form.password) ? 'text-emerald-600' : 'text-ink-400')
-                }
-              >
-                {rule.test(form.password) ? '✓' : '○'} {rule.label}
-              </p>
-            ))}
           </div>
         </div>
 

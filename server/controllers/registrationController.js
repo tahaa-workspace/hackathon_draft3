@@ -186,16 +186,31 @@ async function createEmailVerificationSession(user) {
     '/verify-email?token=' +
     encodeURIComponent(token);
 
-  const content =
-    registrationVerificationLinkTemplate({
-      name: user.name || user.username,
-      verificationUrl,
-    });
+  const dummyEmailMode =
+    process.env.ALLOW_DUMMY_EMAIL_OTP === 'true';
 
-  await sendTransactionalEmail({
-    to: user.email,
-    ...content,
-  });
+  if (dummyEmailMode) {
+    console.log('\n===============================================');
+    console.log('NEXT GEN VAULT - DEMO EMAIL VERIFICATION LINK');
+    console.log(`User: ${user.email}`);
+    console.log(`Link: ${verificationUrl}`);
+    console.log('===============================================\n');
+  } else {
+    try {
+      const content =
+        registrationVerificationLinkTemplate({
+          name: user.name || user.username,
+          verificationUrl,
+        });
+
+      await sendTransactionalEmail({
+        to: user.email,
+        ...content,
+      });
+    } catch (mailError) {
+      console.error('Email verification link delivery failed:', mailError.message);
+    }
+  }
 
   return {
     expiresAt,
@@ -793,14 +808,24 @@ export async function requestRegistrationEmailOTP(
     }
 
 
+    const dummyEmailOtp =
+      process.env.ALLOW_DUMMY_EMAIL_OTP === 'true';
+
+    const configuredDevOtp =
+      dummyEmailOtp &&
+      process.env.NODE_ENV !== 'production' &&
+      process.env.DEV_EMAIL_OTP
+        ? String(process.env.DEV_EMAIL_OTP).trim()
+        : null;
+
     const otp =
+      configuredDevOtp ||
       crypto
         .randomInt(
           100000,
           1000000
         )
         .toString();
-
 
     const otpHash =
       await bcrypt.hash(
@@ -865,44 +890,65 @@ export async function requestRegistrationEmailOTP(
     }
 
 
-    try {
-      const emailContent = registrationOtpTemplate({
-        name: email,
-        otp,
-      });
+    if (dummyEmailOtp) {
+      /*
+      =========================================
+      DEVELOPMENT DUMMY MODE
+      =========================================
+      OTP is printed to the backend console instead of
+      being delivered via SMTP. Enabled by:
+        ALLOW_DUMMY_EMAIL_OTP=true
+      */
 
-      await sendTransactionalEmail({
-        to: email,
-        ...emailContent,
-      });
-    } catch (mailError) {
-      await RegistrationEmailVerification.deleteOne({
-        email,
-      });
+      console.log('\n===============================================');
+      console.log('NEXT GEN VAULT - DEMO REGISTRATION EMAIL OTP');
+      console.log(`Email: ${email}`);
+      console.log(`OTP: ${otp}`);
+      console.log('Valid for: 5 minutes');
+      console.log('===============================================\n');
 
-      console.error(
-        'Registration email OTP send error:',
-        mailError
-      );
-
-      return res
-        .status(500)
-        .json({
-          message:
-            'Unable to send the email OTP. Please check the email configuration and try again.',
+    } else {
+      try {
+        const emailContent = registrationOtpTemplate({
+          name: email,
+          otp,
         });
+
+        await sendTransactionalEmail({
+          to: email,
+          ...emailContent,
+        });
+      } catch (mailError) {
+        await RegistrationEmailVerification.deleteOne({
+          email,
+        });
+
+        console.error(
+          'Registration email OTP send error:',
+          mailError
+        );
+
+        return res
+          .status(500)
+          .json({
+            message:
+              'Unable to send the email OTP. Please check the email configuration and try again.',
+          });
+      }
     }
 
     return res
       .status(200)
       .json({
         message:
-          'OTP sent to your email address.',
+          dummyEmailOtp
+            ? 'Demo OTP generated. Check the backend terminal for the 6-digit OTP.'
+            : 'OTP sent to your email address.',
 
         email,
 
         demoMode:
-          false,
+          dummyEmailOtp,
 
         expiresInSeconds:
           OTP_EXPIRY_MS /
@@ -1040,11 +1086,22 @@ export async function verifyRegistrationEmailOTP(
     }
 
 
+    const dummyEmailOtp =
+      process.env.ALLOW_DUMMY_EMAIL_OTP === 'true';
+
+    const configuredDevOtp =
+      dummyEmailOtp &&
+      process.env.NODE_ENV !== 'production' &&
+      process.env.DEV_EMAIL_OTP
+        ? String(process.env.DEV_EMAIL_OTP).trim()
+        : null;
+
     const approved =
-      await bcrypt.compare(
+      (configuredDevOtp && otp === configuredDevOtp) ||
+      (await bcrypt.compare(
         otp,
         session.otpHash
-      );
+      ));
 
 
     if (!approved) {
@@ -1227,15 +1284,12 @@ export async function registerOwner(
       });
   }
 
-  if (
-    password.length <
-    8
-  ) {
+  if (password.length < 6) {
     return res
       .status(400)
       .json({
         message:
-          'Password must be at least 8 characters long.',
+          'Password must be at least 6 characters long.',
       });
   }
 

@@ -24,11 +24,13 @@ export default async function cleanupUserAadhaarPlaceholderOnReject(
 
     return next();
   } catch (error) {
-    console.error('Aadhaar placeholder cleanup before rejection failed:', error);
+    // Log the cleanup failure but do NOT block the rejection.
+    // An orphan placeholder is preferable to a permanently-stuck PENDING registration.
+    console.error(
+      'Aadhaar placeholder cleanup before rejection failed (proceeding anyway):',
+      error.message
+    );
 
-    return res.status(502).json({
-      message:
-        'Unable to remove the Aadhaar placeholder from cloud storage. Registration was not rejected.',
-    });
+    return next();
   }
 }

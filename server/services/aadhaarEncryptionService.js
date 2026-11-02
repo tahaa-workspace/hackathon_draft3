@@ -94,9 +94,13 @@ export function getAadhaarPlaceholderPublicId(encryptedPublicId) {
   return `${AADHAAR_PLACEHOLDER_FOLDER}/aadhaar-${assetId}`;
 }
 
-async function uploadEncryptedAadhaarBlob(encryptedBuffer, assetId) {
+async function uploadEncryptedAadhaarBlob(
+  encryptedBuffer,
+  assetId,
+  folder = ENCRYPTED_AADHAAR_FOLDER
+) {
   return new Promise((resolve, reject) => {
-    const publicId = `${ENCRYPTED_AADHAAR_FOLDER}/${assetId}.vault`;
+    const publicId = `${folder}/${assetId}.vault`;
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -131,14 +135,18 @@ export async function uploadAadhaarPlaceholder(assetId) {
   });
 }
 
-export async function uploadEncryptedAadhaar(encryptedBuffer) {
+export async function uploadEncryptedAadhaar(
+  encryptedBuffer,
+  folder = ENCRYPTED_AADHAAR_FOLDER
+) {
   const assetId = crypto.randomUUID();
   let encryptedUpload = null;
 
   try {
     encryptedUpload = await uploadEncryptedAadhaarBlob(
       encryptedBuffer,
-      assetId
+      assetId,
+      folder
     );
 
     const placeholderUpload = await uploadAadhaarPlaceholder(assetId);

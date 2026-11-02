@@ -106,17 +106,46 @@ export async function registerLawyer(req, res) {
     });
   }
 
-  if (password.length < 8) {
+  const normalizedUsername = username.trim().toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPhone = String(phone).trim();
+  const normalizedEnrollmentNumber = enrollmentNumber.trim();
+
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    return res.status(400).json({ message: 'Enter a valid email address.' });
+  }
+
+  if (!/^\d{10}$/.test(normalizedPhone)) {
+    return res.status(400).json({ message: 'Mobile number must contain exactly 10 digits.' });
+  }
+
+  if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername)) {
     return res.status(400).json({
-      message: 'Password must be at least 8 characters long.',
+      message: 'Username must be between 3 and 30 characters and contain only letters, numbers, dots, underscores, or hyphens.',
+    });
+  }
+
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+
+  if (
+    password.length < 8 ||
+    !hasUppercase ||
+    !hasLowercase ||
+    !hasNumber ||
+    !hasSpecial
+  ) {
+    return res.status(400).json({
+      message: 'Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.',
     });
   }
 
   let parsedYears = null;
-
   if (yearsOfExperience !== undefined && String(yearsOfExperience).trim() !== '') {
     parsedYears = Number(yearsOfExperience);
-
     if (!Number.isFinite(parsedYears) || parsedYears < 0) {
       return res.status(400).json({
         message: 'Years of experience must be a non-negative number.',
@@ -124,14 +153,11 @@ export async function registerLawyer(req, res) {
     }
   }
 
-  const normalizedUsername = username.trim().toLowerCase();
-  const normalizedEmail = email.trim().toLowerCase();
-  const normalizedEnrollmentNumber = enrollmentNumber.trim();
-
   const existing = await User.findOne({
     $or: [
       { username: normalizedUsername },
       { email: normalizedEmail },
+      { phone: normalizedPhone },
       {
         role: 'LAWYER',
         'lawyerProfile.enrollmentNumber': normalizedEnrollmentNumber,

@@ -842,17 +842,9 @@ export async function approveUser(
         });
     }
 
-    if (
-      user.role === 'USER' &&
-      !user.emailVerified
-    ) {
-      return res
-        .status(409)
-        .json({
-          message:
-            'The user must verify their registered email address before administrator approval.',
-        });
-    }
+    // Note: Admin can approve even if email is not yet verified.
+    // This prevents permanent PENDING lock when SMTP is unavailable during testing.
+    const emailNotVerified = user.role === 'USER' && !user.emailVerified;
 
     user.status =
       'ACTIVE';
@@ -920,7 +912,11 @@ export async function approveUser(
           user.role ===
           'LAWYER'
             ? 'Lawyer approved. The professional account is now active.'
-            : 'User approved. They may now log in.',
+            : emailNotVerified
+              ? 'User approved. Note: the user has not verified their email yet – they must verify before logging in.'
+              : 'User approved. They may now log in.',
+
+        ...(emailNotVerified ? { emailWarning: 'User email is not yet verified. They will need to verify before they can log in.' } : {}),
 
         user:
           registrationPayload(
@@ -1067,8 +1063,10 @@ export async function rejectUser(
           deletionResult.result !==
             'not found'
         ) {
+          // Log the unexpected result but continue with the rejection.
+          // An orphan file in Cloudinary is preferable to a permanently-stuck registration.
           console.error(
-            'Unexpected Cloudinary deletion result:',
+            'Unexpected Cloudinary deletion result (rejection will continue):',
             {
               userId:
                 user._id.toString(),
@@ -1083,18 +1081,12 @@ export async function rejectUser(
                 deletionResult.result,
             }
           );
-
-          return res
-            .status(502)
-            .json({
-              message:
-                'Unable to remove the verification document from cloud storage. Registration was not rejected.',
-            });
         }
 
       } catch (error) {
+        // Log the failure but still proceed with the MongoDB deletion.
         console.error(
-          'Cloudinary verification document deletion failed:',
+          'Cloudinary verification document deletion failed (rejection will continue):',
           {
             userId:
               user._id.toString(),
@@ -1109,13 +1101,6 @@ export async function rejectUser(
               error.message,
           }
         );
-
-        return res
-          .status(502)
-          .json({
-            message:
-              'Unable to remove the verification document from cloud storage. Registration was not rejected. Please try again.',
-          });
       }
     }
 

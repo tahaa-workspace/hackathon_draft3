@@ -6,9 +6,13 @@ import {
 } from 'react';
 
 import {
+  Archive,
+  Briefcase,
   Check,
+  ChevronRight,
   Clock3,
   Eye,
+  FileSearch2,
   FileText,
   Filter,
   Inbox,
@@ -22,6 +26,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
@@ -115,6 +120,7 @@ function formatFileSize(bytes) {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [pending, setPending] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -561,6 +567,87 @@ export default function AdminDashboard() {
             helper={`${stats.active} active · ${stats.suspended} suspended`}
             accent="slate"
           />
+        </section>
+
+        {/* ADMIN MODULES QUICK-ACCESS HUB */}
+        <section className="mb-7">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <button
+              type="button"
+              onClick={() => navigate('/admin/records')}
+              className="group flex flex-col justify-between rounded-2xl border border-indigo-100 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition group-hover:bg-indigo-600 group-hover:text-white">
+                  <Archive size={20} />
+                </div>
+                <ChevronRight size={17} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-indigo-600" />
+              </div>
+              <div className="mt-4">
+                <h3 className="font-bold text-slate-900 group-hover:text-indigo-600">Documents & Records</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Inspect vault documents, verify integrity metadata, and review asset records.
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/admin/legacy-claims')}
+              className="group flex flex-col justify-between rounded-2xl border border-amber-100 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-700 transition group-hover:bg-amber-600 group-hover:text-white">
+                  <FileText size={20} />
+                </div>
+                <ChevronRight size={17} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-amber-600" />
+              </div>
+              <div className="mt-4">
+                <h3 className="font-bold text-slate-900 group-hover:text-amber-600">Legacy Claims Review</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Review claim submissions, examine proof of demise, and route to assigned lawyers.
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/admin/legal-requests')}
+              className="group flex flex-col justify-between rounded-2xl border border-violet-100 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 transition group-hover:bg-violet-600 group-hover:text-white">
+                  <Briefcase size={20} />
+                </div>
+                <ChevronRight size={17} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-violet-600" />
+              </div>
+              <div className="mt-4">
+                <h3 className="font-bold text-slate-900 group-hover:text-violet-600">Legal Consultations</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Monitor lifetime consultation requests submitted by users to registered lawyers.
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/admin/audit-logs')}
+              className="group flex flex-col justify-between rounded-2xl border border-emerald-100 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-600 group-hover:text-white">
+                  <FileSearch2 size={20} />
+                </div>
+                <ChevronRight size={17} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-emerald-600" />
+              </div>
+              <div className="mt-4">
+                <h3 className="font-bold text-slate-900 group-hover:text-emerald-600">Audit & Security Logs</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Complete forensic trail of logins, document access, reviews, and allocations.
+                </p>
+              </div>
+            </button>
+          </div>
         </section>
 
         {/* PENDING APPROVAL FLOW - SAME POSITION */}

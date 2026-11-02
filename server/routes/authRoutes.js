@@ -88,8 +88,6 @@ router.post(
     "/register",
     registrationRateLimit,
     upload.single("aadhaar"),
-    requireExactRegistrationMobile,
-    requireStrongRegistrationPassword,
     registerOwner
 );
 

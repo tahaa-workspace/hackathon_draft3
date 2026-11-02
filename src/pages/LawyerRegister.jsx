@@ -73,13 +73,44 @@ export default function LawyerRegister() {
     event.preventDefault();
     setError('');
 
-    if (form.password !== form.confirmPassword) {
-      setError('Password and confirm password do not match.');
+    if (!form.name.trim()) {
+      setError('Full name is required.');
       return;
     }
 
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters long.');
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(form.username.trim())) {
+      setError('Username must be between 3 and 30 characters and contain only letters, numbers, periods, underscores, or hyphens.');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError('Enter a valid email address.');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(form.phone.trim())) {
+      setError('Mobile number must contain exactly 10 digits.');
+      return;
+    }
+
+    const hasUppercase = /[A-Z]/.test(form.password);
+    const hasLowercase = /[a-z]/.test(form.password);
+    const hasNumber = /\d/.test(form.password);
+    const hasSpecial = /[^A-Za-z0-9]/.test(form.password);
+
+    if (
+      form.password.length < 8 ||
+      !hasUppercase ||
+      !hasLowercase ||
+      !hasNumber ||
+      !hasSpecial
+    ) {
+      setError('Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.');
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError('Password and confirm password do not match.');
       return;
     }
 

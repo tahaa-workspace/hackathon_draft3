@@ -6,6 +6,7 @@ import {
   Briefcase,
   ChevronRight,
   FileSearch2,
+  FileText,
   Home,
   KeyRound,
   LayoutDashboard,
@@ -197,6 +198,14 @@ export default function Navbar() {
               </button>
               <button
                 type="button"
+                onClick={() => navigate('/admin/legacy-claims')}
+                className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-white px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 lg:inline-flex"
+              >
+                <FileText size={16} />
+                Legacy Claims
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate('/admin/legal-requests')}
                 className="hidden items-center gap-2 rounded-xl border border-brand-100 bg-white px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 2xl:inline-flex"
               >
@@ -335,6 +344,22 @@ export default function Navbar() {
             <button type="button" onClick={() => navigate('/lawyer/consultations')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
               <Briefcase size={14} /> Consultations
             </button>
+          )}
+          {user.role === 'ADMIN' && (
+            <>
+              <button type="button" onClick={() => navigate('/admin/records')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+                <Archive size={14} /> Records
+              </button>
+              <button type="button" onClick={() => navigate('/admin/legacy-claims')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+                <FileText size={14} /> Claims
+              </button>
+              <button type="button" onClick={() => navigate('/admin/legal-requests')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+                <Briefcase size={14} /> Legal
+              </button>
+              <button type="button" onClick={() => navigate('/admin/audit-logs')} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-600">
+                <FileSearch2 size={14} /> Logs
+              </button>
+            </>
           )}
         </div>
       </div>
