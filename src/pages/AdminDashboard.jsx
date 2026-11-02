@@ -9,6 +9,7 @@ import {
   Archive,
   Briefcase,
   Check,
+  CheckCircle2,
   ChevronRight,
   Clock3,
   Eye,
@@ -128,22 +129,18 @@ export default function AdminDashboard() {
     useState(true);
   const [accountsLoading, setAccountsLoading] =
     useState(true);
-  const [pendingError, setPendingError] =
-    useState('');
-  const [accountsError, setAccountsError] =
-    useState('');
-  const [actionLoadingId, setActionLoadingId] =
-    useState(null);
-  const [documentLoadingId, setDocumentLoadingId] =
-    useState(null);
+  const [pendingError, setPendingError] = useState('');
+  const [pendingSuccess, setPendingSuccess] = useState('');
+  const [accountsError, setAccountsError] = useState('');
+  const [accountsSuccess, setAccountsSuccess] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [documentLoadingId, setDocumentLoadingId] = useState(null);
 
-  const [pendingFilter, setPendingFilter] =
-    useState('ALL');
+  const [pendingFilter, setPendingFilter] = useState('ALL');
+  const [pendingSearch, setPendingSearch] = useState('');
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] =
-    useState('ALL');
-  const [statusFilter, setStatusFilter] =
-    useState('ALL');
+  const [roleFilter, setRoleFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const loadPending = useCallback(async () => {
     setPendingLoading(true);
@@ -227,16 +224,19 @@ export default function AdminDashboard() {
     [pending]
   );
 
-  const filteredPending = useMemo(
-    () =>
-      pendingFilter === 'ALL'
-        ? pending
-        : pending.filter(
-            (item) =>
-              item.role === pendingFilter
-          ),
-    [pending, pendingFilter]
-  );
+  const filteredPending = useMemo(() => {
+    const q = pendingSearch.trim().toLowerCase();
+    return pending.filter((item) => {
+      const matchesRole =
+        pendingFilter === 'ALL' || item.role === pendingFilter;
+      const matchesQuery =
+        !q ||
+        [item.name, item.email, item.username].some((val) =>
+          String(val || '').toLowerCase().includes(q)
+        );
+      return matchesRole && matchesQuery;
+    });
+  }, [pending, pendingFilter, pendingSearch]);
 
   const stats = useMemo(
     () => ({
@@ -312,19 +312,21 @@ export default function AdminDashboard() {
         : 'user';
 
     const confirmed = window.confirm(
-      `Approve this ${label} registration?`
+      `Approve this ${label} registration for ${item.name}?`
     );
 
     if (!confirmed) return;
 
     setActionLoadingId(item.id);
     setPendingError('');
+    setPendingSuccess('');
 
     try {
       await approveUser(item.id);
+      setPendingSuccess(`Registration for ${item.name} (${item.role}) approved successfully. Account is now active.`);
       await refreshAll();
     } catch (err) {
-      setPendingError(err.message);
+      setPendingError(err.message || 'Failed to approve registration.');
     } finally {
       setActionLoadingId(null);
     }
@@ -349,12 +351,14 @@ export default function AdminDashboard() {
 
     setActionLoadingId(item.id);
     setPendingError('');
+    setPendingSuccess('');
 
     try {
       await rejectUser(item.id, reason);
+      setPendingSuccess(`Registration for ${item.name} has been rejected.`);
       await refreshAll();
     } catch (err) {
-      setPendingError(err.message);
+      setPendingError(err.message || 'Failed to reject registration.');
     } finally {
       setActionLoadingId(null);
     }
@@ -386,9 +390,13 @@ export default function AdminDashboard() {
           );
 
           if (!reviewWindow) {
-            throw new Error(
-              'The browser blocked the professional credential window. Please allow pop-ups and try again.'
-            );
+            const a = document.createElement('a');
+            a.href = result.url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
           }
 
           return;
@@ -407,10 +415,13 @@ export default function AdminDashboard() {
         );
 
         if (!popup) {
-          URL.revokeObjectURL(url);
-          throw new Error(
-            'Browser blocked the Aadhaar document window. Please allow pop-ups for this site.'
-          );
+          const a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
         }
 
         setTimeout(
@@ -447,15 +458,17 @@ export default function AdminDashboard() {
 
     setActionLoadingId(item.id);
     setAccountsError('');
+    setAccountsSuccess('');
 
     try {
       await updateUserStatus(
         item.id,
         nextStatus
       );
+      setAccountsSuccess(`${item.name}'s account status updated to ${nextStatus}.`);
       await loadAccounts();
     } catch (err) {
-      setAccountsError(err.message);
+      setAccountsError(err.message || 'Unable to update account status.');
     } finally {
       setActionLoadingId(null);
     }
@@ -547,10 +560,10 @@ export default function AdminDashboard() {
             accent="indigo"
           />
           <StatCard
-            icon={Link2}
-            label="User model"
-            value="Unified"
-            helper="Ownership and legacy access are relationships"
+            icon={CheckCircle2}
+            label="Active accounts"
+            value={stats.active}
+            helper="Fully verified & enabled"
             accent="cyan"
           />
           <StatCard
@@ -571,26 +584,7 @@ export default function AdminDashboard() {
 
         {/* ADMIN MODULES QUICK-ACCESS HUB */}
         <section className="mb-7">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <button
-              type="button"
-              onClick={() => navigate('/admin/records')}
-              className="group flex flex-col justify-between rounded-2xl border border-indigo-100 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition group-hover:bg-indigo-600 group-hover:text-white">
-                  <Archive size={20} />
-                </div>
-                <ChevronRight size={17} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-indigo-600" />
-              </div>
-              <div className="mt-4">
-                <h3 className="font-bold text-slate-900 group-hover:text-indigo-600">Documents & Records</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Inspect vault documents, verify integrity metadata, and review asset records.
-                </p>
-              </div>
-            </button>
-
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <button
               type="button"
               onClick={() => navigate('/admin/legacy-claims')}
@@ -674,6 +668,19 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <label className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  value={pendingSearch}
+                  onChange={(e) => setPendingSearch(e.target.value)}
+                  placeholder="Search pending applicants…"
+                  className="h-9 w-44 rounded-xl border border-amber-200 bg-white pl-8 pr-3 text-xs text-slate-800 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:w-56"
+                />
+              </label>
+
               {[
                 [
                   'ALL',
@@ -694,7 +701,7 @@ export default function AdminDashboard() {
                   onClick={() =>
                     setPendingFilter(value)
                   }
-                  className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                  className={`h-9 rounded-xl border px-3 text-xs font-semibold transition ${
                     pendingFilter === value
                       ? 'border-amber-300 bg-amber-100 text-amber-900'
                       : 'border-amber-200 bg-white text-amber-700 hover:bg-amber-50'
@@ -708,10 +715,10 @@ export default function AdminDashboard() {
                 type="button"
                 onClick={loadPending}
                 disabled={pendingLoading}
-                className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-amber-200 bg-white px-3 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
               >
                 <RefreshCw
-                  size={14}
+                  size={13}
                   className={
                     pendingLoading
                       ? 'animate-spin'
@@ -723,9 +730,35 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {pendingSuccess && (
+            <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-800">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{pendingSuccess}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingSuccess('')}
+                className="text-emerald-500 hover:text-emerald-700"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
+
           {pendingError && (
-            <div className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
-              {pendingError}
+            <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
+              <div className="flex items-center gap-2">
+                <X size={16} className="text-red-500 shrink-0" />
+                <span>{pendingError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingError('')}
+                className="text-red-400 hover:text-red-600"
+              >
+                <X size={15} />
+              </button>
             </div>
           )}
 
@@ -962,10 +995,10 @@ export default function AdminDashboard() {
                                 handleApprove(item)
                               }
                               disabled={
-                                actionLoadingId === item.id ||
-                                (item.role === 'USER' && !item.emailVerified)
+                                actionLoadingId === item.id
                               }
                               className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-800 disabled:opacity-50"
+                              title="Approve registration"
                             >
                               {actionLoadingId ===
                               item.id ? (
@@ -1012,9 +1045,35 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {accountsSuccess && (
+            <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-800">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{accountsSuccess}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAccountsSuccess('')}
+                className="text-emerald-500 hover:text-emerald-700"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
+
           {accountsError && (
-            <div className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
-              {accountsError}
+            <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
+              <div className="flex items-center gap-2">
+                <X size={16} className="text-red-500 shrink-0" />
+                <span>{accountsError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAccountsError('')}
+                className="text-red-400 hover:text-red-600"
+              >
+                <X size={15} />
+              </button>
             </div>
           )}
 
@@ -1037,7 +1096,7 @@ export default function AdminDashboard() {
             <label className="relative">
               <Filter
                 size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <select
                 value={roleFilter}
@@ -1046,7 +1105,7 @@ export default function AdminDashboard() {
                     event.target.value
                   )
                 }
-                className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
               >
                 <option value="ALL">
                   All roles
@@ -1067,7 +1126,7 @@ export default function AdminDashboard() {
                   event.target.value
                 )
               }
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
             >
               <option value="ALL">
                 All statuses

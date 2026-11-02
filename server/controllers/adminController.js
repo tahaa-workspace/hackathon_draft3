@@ -849,6 +849,10 @@ export async function approveUser(
     user.status =
       'ACTIVE';
 
+    if (user.role === 'USER') {
+      user.emailVerified = true;
+    }
+
     user.verification = {
       reviewedBy:
         req.user.id,
